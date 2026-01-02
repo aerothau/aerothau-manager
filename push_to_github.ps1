@@ -1,63 +1,31 @@
-﻿# Script PowerShell pour automatiser l'envoi sur GitHub (Version aerothau-manager)
-
-Clear-Host
+﻿Clear-Host
 Write-Host "--- DÉBUT DU PROCESSUS D'ENVOI ---" -ForegroundColor Magenta
 
-# 0. Vérification du dossier projet
 if (-not (Test-Path "package.json")) {
-    Write-Host "❌ Erreur : Vous n'êtes pas à la racine du projet (package.json non trouvé)." -ForegroundColor Red
-    Write-Host "Tapez 'cd' suivi du chemin de votre dossier projet." 
-    Read-Host "Appuyez sur Entrée pour quitter..."
+    Write-Host "❌ Erreur : Vous n'êtes pas dans le dossier projet." -ForegroundColor Red
     exit
 }
 
-# 1. Demander le nom d'utilisateur GitHub
 $githubUser = Read-Host "Entrez votre nom d'utilisateur GitHub"
-if (-not $githubUser) {
-    Write-Host "❌ Erreur : Nom d'utilisateur vide." -ForegroundColor Red
-    Read-Host "Appuyez sur Entrée pour quitter..."
-    exit
-}
+if (-not $githubUser) { exit }
 
-# 2. Initialisation Git et commit
-Write-Host "-> Vérification de Git..." -ForegroundColor Cyan
-if (-not (Test-Path ".git")) {
-    Write-Host "-> Initialisation du dépôt local..."
-    git init
-}
-
-Write-Host "-> Ajout des fichiers..." -ForegroundColor Cyan
+Write-Host "-> Préparation de Git..." -ForegroundColor Cyan
+if (-not (Test-Path ".git")) { git init }
 git add .
-
-Write-Host "-> Création du point de sauvegarde (commit)..." -ForegroundColor Cyan
-git commit -m "Mise à jour Aerothau Manager : Cockpit et Correction UI"
-
-# 3. Configuration de la branche et du lien distant
-Write-Host "-> Configuration de la branche 'main'..." -ForegroundColor Cyan
+git commit -m "Mise à jour Aerothau Manager"
 git branch -M main
 
-Write-Host "-> Mise à jour du serveur distant (GitHub)..." -ForegroundColor Cyan
-$remoteExists = git remote | Select-String "origin"
-if ($remoteExists) {
-    git remote remove origin
-}
-
-# Configuration de l'URL vers le dépôt aerothau-manager
+Write-Host "-> Connexion à GitHub..." -ForegroundColor Cyan
+if (git remote) { git remote remove origin }
 git remote add origin "https://github.com/$githubUser/aerothau-manager.git"
 
-# 4. Envoi sur les serveurs
-Write-Host "-> Transfert vers GitHub... (Une fenêtre de connexion peut s'ouvrir)" -ForegroundColor Yellow
+Write-Host "-> Envoi vers le serveur... (Vérifiez si une fenêtre s'ouvre)" -ForegroundColor Yellow
 git push -u origin main --force
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "----------------------------------------------------" -ForegroundColor Red
-    Write-Host "❌ Erreur de transfert." -ForegroundColor Red
-    Write-Host "Vérifiez que le dépôt 'aerothau-manager' existe sur votre compte GitHub." -ForegroundColor Red
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "✅ TERMINÉ ! Votre code est en ligne." -ForegroundColor Green
+    Write-Host "Lien : https://$githubUser.github.io/aerothau-manager/" -ForegroundColor Cyan
 } else {
-    Write-Host "----------------------------------------------------" -ForegroundColor Green
-    Write-Host "✅ Succès ! Votre code est synchronisé sur GitHub." -ForegroundColor Green
-    Write-Host "Allez sur GitHub > Onglet 'Actions' pour voir le déploiement." -ForegroundColor Green
+    Write-Host "❌ Erreur de transfert." -ForegroundColor Red
 }
-
-Write-Host "----------------------------------------------------"
-Read-Host "Appuyez sur Entrée pour fermer cette fenêtre..."
+Read-Host "Appuyez sur Entrée pour quitter..."
