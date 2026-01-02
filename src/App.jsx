@@ -154,7 +154,7 @@ const SPECIFIC_CHECKLISTS = {
 
 // --- 4. HELPERS ---
 const calculateDuration = (start, end) => {
-  if (!start || !end) return 0;
+  if (!start || !end || !start.includes(':') || !end.includes(':')) return 0;
   try {
     const [h1, m1] = start.split(':').map(Number);
     const [h2, m2] = end.split(':').map(Number);
@@ -219,14 +219,26 @@ const LoginScreen = () => {
 };
 
 const DashboardStats = ({ missions }) => {
-  const totalMissions = missions.length;
-  const totalMinutes = missions.reduce((acc, m) => acc + (m.logs?.reduce((sum, l) => sum + calculateDuration(l.start, l.end), 0) || 0), 0);
-  const totalKm = missions.reduce((acc, m) => {
-    const start = parseFloat(m.kmStart) || 0;
-    const end = parseFloat(m.kmEnd) || 0;
-    return acc + Math.max(0, end - start);
-  }, 0);
-  const totalOvernights = missions.filter(m => m.overnight).length;
+  // Calcul en temps réel basé sur la prop missions
+  const stats = useMemo(() => {
+    const totalMinutes = missions.reduce((acc, m) => {
+        const flightTime = m.logs?.reduce((sum, l) => sum + calculateDuration(l.start, l.end), 0) || 0;
+        return acc + flightTime;
+    }, 0);
+
+    const totalKm = missions.reduce((acc, m) => {
+        const start = parseFloat(m.kmStart) || 0;
+        const end = parseFloat(m.kmEnd) || 0;
+        return acc + Math.max(0, end - start);
+    }, 0);
+
+    return {
+        count: missions.length,
+        hours: (totalMinutes / 60).toFixed(1),
+        km: totalKm,
+        nights: missions.filter(m => m.overnight).length
+    };
+  }, [missions]);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 print:hidden">
@@ -234,28 +246,28 @@ const DashboardStats = ({ missions }) => {
         <div className="bg-sky-100 p-3 rounded-2xl text-sky-600"><Plane size={24}/></div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Missions</p>
-          <p className="text-2xl font-black text-slate-900 leading-none">{totalMissions}</p>
+          <p className="text-2xl font-black text-slate-900 leading-none">{stats.count}</p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
         <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600"><Clock size={24}/></div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Vol</p>
-          <p className="text-2xl font-black text-emerald-600 leading-none">{(totalMinutes/60).toFixed(1)}h</p>
+          <p className="text-2xl font-black text-emerald-600 leading-none">{stats.hours}h</p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
         <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Car size={24}/></div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Km</p>
-          <p className="text-2xl font-black text-orange-600">{totalKm}</p>
+          <p className="text-2xl font-black text-orange-600 leading-none">{stats.km}</p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
         <div className="bg-indigo-100 p-3 rounded-2xl text-indigo-600"><Moon size={24}/></div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Découchers</p>
-          <p className="text-2xl font-black text-indigo-600">{totalOvernights}</p>
+          <p className="text-2xl font-black text-indigo-600">{stats.nights}</p>
         </div>
       </div>
     </div>
@@ -284,59 +296,81 @@ const MapView = ({ location }) => {
 
 const SignaturePad = ({ title, onSave, savedData }) => {
   const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawing = useRef(false);
   const [isEmpty, setIsEmpty] = useState(!savedData);
 
   useEffect(() => {
-    if (savedData && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // Nettoyer et redessiner si data existante
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (savedData) {
       const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, canvasRef.current.width, canvasRef.current.height);
+      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       img.src = savedData;
     }
-  }, [savedData]);
 
-  const getCoords = (e) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { 
-        x: (clientX - rect.left) * (canvasRef.current.width / rect.width), 
-        y: (clientY - rect.top) * (canvasRef.current.height / rect.height) 
+    const getCoords = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { 
+        x: (clientX - rect.left) * (canvas.width / rect.width), 
+        y: (clientY - rect.top) * (canvas.height / rect.height) 
+      };
     };
-  };
 
-  const startDrawing = (e) => {
-    const { x, y } = getCoords(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "#0f172a";
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    setIsDrawing(true);
-    setIsEmpty(false);
-  };
+    const start = (e) => {
+      isDrawing.current = true;
+      const { x, y } = getCoords(e);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      setIsEmpty(false);
+    };
 
-  const draw = (e) => {
-    if (!isDrawing) return;
-    const { x, y } = getCoords(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
+    const move = (e) => {
+      if (!isDrawing.current) return;
+      if (e.cancelable) e.preventDefault();
+      const { x, y } = getCoords(e);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    };
 
-  const stopDrawing = () => {
-    if (isDrawing) {
-      setIsDrawing(false);
-      onSave(canvasRef.current.toDataURL());
-    }
-  };
+    const stop = () => {
+      if (isDrawing.current) {
+        isDrawing.current = false;
+        onSave(canvas.toDataURL());
+      }
+    };
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', stop);
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => { e.preventDefault(); move(e); }, { passive: false });
+    canvas.addEventListener('touchend', stop);
+
+    return () => {
+      canvas.removeEventListener('mousedown', start);
+      canvas.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', stop);
+      canvas.removeEventListener('touchstart', start);
+      canvas.removeEventListener('touchmove', move);
+      canvas.removeEventListener('touchend', stop);
+    };
+  }, [savedData, onSave]);
 
   const clear = () => {
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     onSave(null);
     setIsEmpty(true);
   };
@@ -348,23 +382,12 @@ const SignaturePad = ({ title, onSave, savedData }) => {
         <button onClick={clear} className="text-[10px] text-red-500 font-black print:hidden uppercase leading-none">Effacer</button>
       </div>
       <div className="relative border-2 border-dashed border-slate-200 rounded-[24px] bg-slate-50 h-32 md:h-40 w-full touch-none overflow-hidden print:bg-white print:border-slate-300">
-        {savedData ? (
-          <img src={savedData} className="w-full h-full object-contain" alt="Signature" />
-        ) : (
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={300}
-            className="w-full h-full cursor-crosshair print:hidden"
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
-            onTouchMove={(e) => { e.preventDefault(); draw(e); }}
-            onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
-          />
-        )}
+        <canvas
+          ref={canvasRef}
+          width={600}
+          height={300}
+          className={`w-full h-full cursor-crosshair ${savedData ? 'pointer-events-none' : ''}`}
+        />
         {isEmpty && !savedData && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 text-[10px] font-black uppercase tracking-widest leading-none">Signer ici</div>}
       </div>
     </div>
@@ -746,7 +769,7 @@ export default function App() {
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900 leading-none">Mission & Client</label>
                                     <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-black transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                    <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0 print:text-xl" placeholder="Nom du client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                    <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0 print:text-xl" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -819,8 +842,8 @@ export default function App() {
                     <div className={`${activeTab === 'technical' ? 'block' : 'hidden print:block'} space-y-10 animate-in fade-in duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
                         <div className="flex flex-col md:flex-row gap-6 items-center mb-8 print:hidden leading-none">
                             <div className="grid grid-cols-3 gap-6 flex-1 w-full leading-none">
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><Wind className="text-sky-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Vent</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} /></div></div>
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><Thermometer className="text-orange-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Temp.</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} /></div></div>
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><Wind className="text-sky-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Vent (km/h)</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} /></div></div>
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><Thermometer className="text-orange-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Temp. (°C)</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} /></div></div>
                                 <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><CloudSun className="text-emerald-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">KP</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} /></div></div>
                             </div>
                             <button onClick={refreshWeather} disabled={weatherLoading} className="bg-slate-900 text-white p-6 rounded-[32px] shadow-xl hover:bg-slate-800 active:scale-95 disabled:opacity-50 leading-none">{weatherLoading ? <Loader2 size={24} className="animate-spin"/> : <RefreshCw size={24}/>}</button>
@@ -886,7 +909,7 @@ export default function App() {
                                         <button key={s.value} onClick={()=>handleUpdate('status', s.value)} className={`p-4 rounded-2xl font-black text-[10px] uppercase transition-all active:scale-95 border-2 ${currentMission.status === s.value ? `${s.color} text-white ${s.border}` : `bg-white text-slate-400 border-slate-100 hover:border-slate-200`}`}>{s.value}</button>
                                     ))}
                                 </div>
-                                <div className="hidden print:block"><p className="text-xl font-black text-black">STATUT : {currentMission.status}</p></div>
+                                <div className="hidden print:block"><p className="text-xl font-black text-black leading-none">STATUT : {currentMission.status}</p></div>
                             </div>
                         </div>
 
