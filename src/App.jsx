@@ -60,7 +60,9 @@ import {
   CheckCircle2,
   FolderOpen,
   Eye,
-  UserPlus
+  UserPlus,
+  RefreshCw,
+  Navigation
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -79,7 +81,43 @@ const db = getFirestore(app);
 
 const LOGO_URL = "logo.png"; 
 
-// --- CONSTANTES MÉTIER ---
+// --- GEMINI API FOR WEATHER ---
+const apiKey = ""; // Runtime provides the key
+
+const fetchWeatherWithIA = async (location) => {
+  if (!location) return null;
+  
+  const systemPrompt = "Tu es un expert météo aéronautique. Donne la météo actuelle pour le lieu spécifié. Répond UNIQUEMENT avec un objet JSON strict : {\"temp\": \"nombre\", \"wind\": \"nombre\", \"kp\": \"nombre\", \"desc\": \"courte description\"}. Les nombres sont sans unités.";
+  const userQuery = `Donne moi la météo actuelle à : ${location}`;
+
+  const fetchWithRetry = async (delay = 1000, retries = 5) => {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: userQuery }] }],
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          tools: [{ "google_search": {} }]
+        })
+      });
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      const jsonStr = text.replace(/```json|```/g, '').trim();
+      return JSON.parse(jsonStr);
+    } catch (error) {
+      if (retries > 0) {
+        await new Promise(res => setTimeout(res, delay));
+        return fetchWithRetry(delay * 2, retries - 1);
+      }
+      throw error;
+    }
+  };
+
+  return fetchWithRetry();
+};
+
+// --- CONSTANTES ---
 const SCENARIO_INFOS = {
     'A1': { title: "Open A1", description: "Survol de personnes isolées possible (pas de rassemblement).", zet: "ZET: Éviter le survol. Pas de distance minimale." },
     'A2': { title: "Open A2", description: "Vol proximité personnes.", zet: "ZET: 30m des tiers (5m si lent)." },
@@ -89,15 +127,12 @@ const SCENARIO_INFOS = {
 };
 
 const MISSION_TYPES = ['Inspection Technique', 'Photogrammétrie', 'Audiovisuel', 'Nettoyage (AirFlyClean)', 'Relevé Lidars', 'Thermographie'];
-
 const DOC_TYPES = ['Arrêté Préfectoral', 'Protocole ATC', 'Assurance RC', 'DNC Pilote', 'Plan de prévention', 'Autre'];
-
 const BASE_CHECKLIST = [
   {k:'meteo',l:'Météo / Vent ok'}, {k:'zet',l:'Balisage ZET'}, {k:'auth',l:'Protocoles / Autorisations'}, 
   {k:'notam',l:'NOTAM / Geoportail'}, {k:'drone_state',l:'État mécanique'}, {k:'batteries',l:'Batteries'}, 
   {k:'sd_card',l:'Carte SD'}, {k:'rtn',l:'Point RTH'}
 ];
-
 const SPECIFIC_CHECKLISTS = {
   'Relevé Lidars': [{k:'imu_warmup',l:'Chauffe IMU (3 min)'}, {k:'gnss_fix',l:'Fix RTK stable'}],
   'Inspection Technique': [{k:'sensor_calib',l:'Calibration nacelle/capteur'}, {k:'obs_check',l:'Distance sécurité obstacle'}],
@@ -125,57 +160,7 @@ const formatDuration = (minutes) => {
   return `${h > 0 ? h + 'h ' : ''}${m}m`;
 };
 
-const formatTimer = (sec) => {
-    const m = Math.floor(sec / 60).toString().padStart(2, '0');
-    const s = (sec % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-};
-
-// --- COMPOSANTS DE STRUCTURE ---
-
-const DashboardStats = ({ missions }) => {
-  const totalMissions = missions.length;
-  const totalMinutes = missions.reduce((acc, m) => acc + (m.logs?.reduce((sum, l) => sum + calculateDuration(l.start, l.end), 0) || 0), 0);
-  const totalKm = missions.reduce((acc, m) => {
-    const start = parseFloat(m.kmStart) || 0;
-    const end = parseFloat(m.kmEnd) || 0;
-    return acc + Math.max(0, end - start);
-  }, 0);
-  const totalOvernights = missions.filter(m => m.overnight).length;
-
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 print:hidden">
-      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-sky-100 p-3 rounded-2xl text-sky-600"><Plane size={24}/></div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Missions</p>
-          <p className="text-2xl font-black text-slate-900">{totalMissions}</p>
-        </div>
-      </div>
-      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600"><Clock size={24}/></div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Heures Vol</p>
-          <p className="text-2xl font-black text-emerald-600">{(totalMinutes/60).toFixed(1)}h</p>
-        </div>
-      </div>
-      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Car size={24}/></div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kilomètres</p>
-          <p className="text-2xl font-black text-orange-600">{totalKm} <span className="text-sm">km</span></p>
-        </div>
-      </div>
-      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-indigo-100 p-3 rounded-2xl text-indigo-600"><Moon size={24}/></div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Découchers</p>
-          <p className="text-2xl font-black text-indigo-600">{totalOvernights}</p>
-        </div>
-      </div>
-    </div>
-  );
-};
+// --- COMPOSANTS ---
 
 const MapView = ({ location }) => {
   const mapUrl = useMemo(() => {
@@ -186,12 +171,12 @@ const MapView = ({ location }) => {
   if (!location) return (
     <div className="h-48 bg-slate-100 rounded-[32px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 print:hidden">
       <MapIcon size={32} className="mb-2 opacity-20"/>
-      <p className="text-[10px] font-black uppercase tracking-widest">Localisation requise</p>
+      <p className="text-[10px] font-black uppercase tracking-widest px-6 text-center">Localisation requise pour la carte satellite</p>
     </div>
   );
 
   return (
-    <div className="h-64 rounded-[32px] overflow-hidden border-4 border-white shadow-xl bg-slate-200 relative animate-in fade-in print:h-48 print:shadow-none print:border-slate-200">
+    <div className="h-64 rounded-[40px] overflow-hidden border-4 border-white shadow-xl bg-slate-200 relative animate-in fade-in print:h-48 print:shadow-none print:border-slate-300">
       <iframe title="Map" width="100%" height="100%" frameBorder="0" src={mapUrl} allowFullScreen></iframe>
     </div>
   );
@@ -276,6 +261,12 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
         return () => clearInterval(timerRef.current);
     }, [isFlying, startTime]);
 
+    const formatTimer = (sec) => {
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
     const handleFlight = () => {
         if (!isFlying) {
             setStartTime(Date.now());
@@ -297,7 +288,7 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
     return (
         <div className="fixed inset-0 bg-slate-950 text-white z-[100] flex flex-col p-4 overflow-y-auto animate-in slide-in-from-bottom-10">
             <div className="flex justify-between items-center mb-6">
-                <button onClick={onExit} className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-lg active:scale-90 transition-transform"><ChevronLeft size={24}/></button>
+                <button onClick={onExit} className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-lg active:scale-90"><ChevronLeft size={24}/></button>
                 <div className="text-center">
                     <h2 className="text-emerald-400 font-black tracking-tighter text-xl uppercase">Cockpit Terrain</h2>
                     <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-widest">{mission.ref}</p>
@@ -307,21 +298,22 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
 
             <div className="flex-1 space-y-6 pb-20 max-w-lg mx-auto w-full">
                 <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 text-center shadow-2xl">
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Chronomètre de Vol</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Temps de Vol</div>
                     <div className="text-7xl font-mono font-black mb-10 tabular-nums text-white tracking-tighter">{formatTimer(elapsed)}</div>
-                    <button onClick={handleFlight} className={`w-full py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isFlying ? 'bg-red-600 animate-pulse' : 'bg-emerald-600 shadow-emerald-900/40 shadow-xl'}`}>
-                        {isFlying ? <><Square fill="currentColor" size={24}/> ATTERRIR</> : <><Play fill="currentColor" size={24}/> DÉCOLLER</>}
+                    <button onClick={handleFlight} className={`w-full py-6 rounded-[28px] font-black text-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isFlying ? 'bg-red-600 animate-pulse' : 'bg-emerald-600 shadow-emerald-900/40 shadow-xl'}`}>
+                        {isFlying ? <Square fill="currentColor" size={24}/> : <Play fill="currentColor" size={24}/>}
+                        {isFlying ? 'ATTERRIR' : 'DÉCOLLER'}
                     </button>
                 </div>
 
                 <div className="space-y-3">
                     {(mission.contacts || []).map((c, i) => (
-                        <a key={i} href={`tel:${c.phone}`} className="bg-blue-600/10 border border-blue-500/20 p-5 rounded-3xl flex justify-between items-center active:bg-blue-600/30">
+                        <a key={i} href={`tel:${c.phone}`} className="bg-blue-600/10 border border-blue-500/20 p-5 rounded-3xl flex justify-between items-center active:bg-blue-600/30 transition-all">
                             <div>
-                                <div className="font-black text-blue-100 uppercase text-xs">{c.name}</div>
+                                <div className="font-black text-blue-100 uppercase text-xs tracking-tight">{c.name}</div>
                                 <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">{c.role}</div>
                             </div>
-                            <div className="bg-blue-600 p-3 rounded-full text-white"><Phone size={20}/></div>
+                            <div className="bg-blue-600 p-3 rounded-full text-white shadow-lg"><Phone size={20}/></div>
                         </a>
                     ))}
                 </div>
@@ -375,7 +367,7 @@ const AdminScreen = ({ onClose, userUid }) => {
             <div className="flex flex-col md:flex-row justify-between gap-6 mb-10 border-b border-slate-200 pb-8">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Administration</h1>
-                    <p className="text-slate-500 text-sm font-medium">Gestion globale des ressources.</p>
+                    <p className="text-slate-500 text-sm font-medium">Configuration globale du cockpit.</p>
                 </div>
                 <div className="flex gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto w-fit h-fit">
                     {['team', 'fleet', 'clients'].map(t => (
@@ -387,11 +379,11 @@ const AdminScreen = ({ onClose, userUid }) => {
             </div>
             {isCreating ? (
                 <form onSubmit={handleAdd} className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-200 mb-8 grid md:grid-cols-3 gap-6 animate-in slide-in-from-top-4">
-                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
-                    <div className="flex gap-2 text-slate-900 font-black">
-                        <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Enregistrer</button>
-                        <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors"><X size={20}/></button>
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-black text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-black text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
+                    <div className="flex gap-2">
+                        <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Valider</button>
+                        <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500"><X size={20}/></button>
                     </div>
                 </form>
             ) : (
@@ -404,9 +396,9 @@ const AdminScreen = ({ onClose, userUid }) => {
                             <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="p-6">
                                     <div className="font-black text-slate-800 uppercase text-sm">{item.name}</div>
-                                    <div className="text-xs text-slate-400 font-bold uppercase">{item.email || item.detail || "Sans précision"}</div>
+                                    <div className="text-xs text-slate-400 font-bold uppercase tracking-wide">{item.email || item.detail || "Sans précision"}</div>
                                 </td>
-                                <td className="p-6 text-right"><button onClick={() => handleDelete(tab, item.id)} className="text-slate-200 hover:text-red-500 active:scale-90"><Trash2 size={20}/></button></td>
+                                <td className="p-6 text-right"><button onClick={() => handleDelete(tab, item.id)} className="text-slate-200 hover:text-red-500 active:scale-90 transition-all"><Trash2 size={20}/></button></td>
                             </tr>
                         ))}
                     </tbody>
@@ -416,7 +408,7 @@ const AdminScreen = ({ onClose, userUid }) => {
     );
 };
 
-// --- APP COMPONENT ---
+// --- MAIN APP COMPONENT ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [missions, setMissions] = useState([]);
@@ -427,6 +419,7 @@ export default function App() {
   const [isFieldMode, setIsFieldMode] = useState(false);
   const [qrModal, setQrModal] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, u => { setUser(u); setLoading(false); });
@@ -446,6 +439,24 @@ export default function App() {
     const updated = { ...currentMission, [f]: v };
     setCurrentMission(updated);
     await updateDoc(doc(db, 'users', user.uid, 'missions', currentMission.id), { [f]: v });
+  };
+
+  const refreshWeather = async () => {
+      if (!currentMission?.location) return;
+      setWeatherLoading(true);
+      try {
+          const w = await fetchWeatherWithIA(currentMission.location);
+          if (w) {
+              await handleUpdate('meteoVent', w.wind);
+              await handleUpdate('meteoTemp', w.temp);
+              await handleUpdate('meteoKP', w.kp);
+              await handleUpdate('meteoDesc', w.desc);
+          }
+      } catch (err) {
+          console.error("Weather failed:", err);
+      } finally {
+          setWeatherLoading(false);
+      }
   };
 
   const handleCreate = async () => {
@@ -486,11 +497,10 @@ export default function App() {
             </>
           ) : view === 'edit' ? (
             <div className="flex gap-2">
-                <button onClick={() => window.print()} className="bg-slate-800 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase flex items-center gap-2 border border-slate-700 active:scale-95 transition-all"><Printer size={18}/> Rapport</button>
-                <button onClick={()=>setIsFieldMode(true)} className="bg-orange-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase flex items-center gap-2 shadow-lg active:scale-95 transition-all"><Maximize size={20}/> Cockpit</button>
+                <button onClick={() => window.print()} className="bg-slate-800 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase flex items-center gap-2 border border-slate-700 active:scale-95 transition-all shadow-lg"><Printer size={18}/> Rapport</button>
+                <button onClick={()=>setIsFieldMode(true)} className="bg-orange-600 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Maximize size={20}/> Cockpit</button>
             </div>
           ) : null}
-          <button onClick={()=>signOut(auth)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-red-900/40 transition-colors print:hidden"><LogOut size={22}/></button>
         </div>
       </nav>
 
@@ -499,8 +509,8 @@ export default function App() {
           <div className="animate-in fade-in duration-500">
             <DashboardStats missions={missions} />
             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Mes Opérations</h2>
-                <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest">Suivi d'activité</div>
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter leading-none">Opérations en cours</h2>
+                <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest">Connecté</div>
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {missions.map(m => (
@@ -510,7 +520,7 @@ export default function App() {
                       <span className="text-[9px] font-black uppercase text-sky-600 px-3 py-1 bg-sky-50 rounded-full">{m.scenario}</span>
                     </div>
                     <h3 className="font-black text-2xl text-slate-900 mb-2 uppercase leading-tight group-hover:text-sky-600 transition-colors tracking-tighter">{m.title || m.client || "Nouvelle Mission"}</h3>
-                    <p className="text-xs text-slate-500 font-bold flex items-center gap-2 uppercase"><MapPin size={16} className="text-slate-300"/>{m.location || "Non localisée"}</p>
+                    <p className="text-xs text-slate-500 font-bold flex items-center gap-2 uppercase tracking-wide"><MapPin size={16} className="text-slate-300"/>{m.location || "Non localisée"}</p>
                     {m.overnight && <span className="absolute top-10 -right-6 bg-indigo-500 text-white text-[8px] font-black px-8 py-1 rotate-45 uppercase shadow-sm">Découcher</span>}
                 </div>
                 ))}
@@ -532,8 +542,8 @@ export default function App() {
                     <span className="text-2xl leading-none">{new Date(m.date).getDate()}</span>
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-black text-xl text-slate-900 uppercase tracking-tighter group-hover:text-sky-600 transition-colors">{m.title || m.client || "Mission sans titre"}</h4>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 flex items-center gap-1"><MapPin size={12}/> {m.location || "Lieu non défini"}</p>
+                    <h4 className="font-black text-xl text-slate-900 uppercase tracking-tighter group-hover:text-sky-600 transition-colors leading-tight">{m.title || m.client || "Mission sans titre"}</h4>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 flex items-center gap-1 leading-none"><MapPin size={12}/> {m.location || "Lieu non défini"}</p>
                   </div>
                   <ChevronRight size={28} className="text-slate-200 group-hover:text-sky-400 group-hover:translate-x-2 transition-all"/>
                 </div>
@@ -554,46 +564,49 @@ export default function App() {
                 </div>
                 
                 <div className="p-8 md:p-14 print:p-0">
-                    <div className="hidden print:flex justify-between items-start border-b-4 border-slate-900 pb-10 mb-10">
-                        <div>
-                            <h1 className="text-5xl font-black uppercase tracking-tighter leading-none mb-2">Compte-Rendu Mission</h1>
-                            <div className="flex gap-4 text-slate-500 font-black uppercase tracking-widest text-xs">
-                                <span>Réf : {currentMission.ref}</span>
-                                <span>Date : {new Date(currentMission.date).toLocaleDateString()}</span>
+                    {/* RAPPORT PDF INTEGRAL */}
+                    <div className="hidden print:block">
+                        <div className="flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12">
+                            <div>
+                                <h1 className="text-6xl font-black uppercase tracking-tighter leading-none mb-3">Compte-Rendu Mission</h1>
+                                <div className="flex gap-6 text-slate-500 font-black uppercase tracking-widest text-sm">
+                                    <span>Référence : {currentMission.ref}</span>
+                                    <span>Date d'opération : {new Date(currentMission.date).toLocaleDateString()}</span>
+                                </div>
                             </div>
+                            <img src={LOGO_URL} className="h-24 object-contain" alt="Aerothau" />
                         </div>
-                        <img src={LOGO_URL} className="h-20 object-contain" alt="Logo Aerothau" />
                     </div>
 
                     {(activeTab === 'general' || window.matchMedia('print').matches) && (
-                        <div className="space-y-12 animate-in slide-in-from-bottom-5 print:space-y-8">
+                        <div className="space-y-12 animate-in slide-in-from-bottom-5">
                             <div className="grid md:grid-cols-2 gap-12 items-start print:grid-cols-2">
-                                <div className="space-y-8 print:space-y-6">
-                                    <div className="space-y-3">
+                                <div className="space-y-8">
+                                    <div className="space-y-4">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Mission & Client</label>
                                         <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Nom du client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0 print:text-xl" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Date</label>
                                             <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:border-none print:p-0" value={currentMission.date || ''} onChange={e => handleUpdate('date', e.target.value)} />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Prestation</label>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Prestation</label>
                                             <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:appearance-none print:border-none print:p-0" value={currentMission.type || ''} onChange={e => handleUpdate('type', e.target.value)}>
                                                 {MISSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Lieu d'emprise</label>
-                                        <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:border-none print:p-0" placeholder="Adresse complète..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Lieu d'intervention</label>
+                                        <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:border-none print:p-0 print:text-lg" placeholder="Adresse complète..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
                                     </div>
                                     
-                                    {/* LOGISTIQUE SEPAREE */}
+                                    {/* LOGISTIQUE */}
                                     <div className="grid grid-cols-2 gap-6 print:grid-cols-2">
-                                        <div className={`p-6 rounded-[32px] border-2 transition-all flex flex-col justify-between ${currentMission.overnight ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-300`}>
+                                        <div className={`p-6 rounded-[32px] border-2 transition-all flex flex-col justify-between ${currentMission.overnight ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-400`}>
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="text-indigo-600 font-black uppercase text-[10px] tracking-widest">Découcher</div>
                                                 <button onClick={()=>handleUpdate('overnight', !currentMission.overnight)} className={`w-12 h-6 rounded-full transition-all relative print:hidden ${currentMission.overnight ? 'bg-indigo-500' : 'bg-slate-300'}`}>
@@ -602,11 +615,11 @@ export default function App() {
                                             </div>
                                             <div className="flex items-center gap-3">
                                                 <Moon className={currentMission.overnight ? 'text-indigo-600' : 'text-slate-300'} size={24}/>
-                                                <span className="font-bold text-slate-700 text-sm">{currentMission.overnight ? 'Grand Déplacement' : 'Base de retour'}</span>
+                                                <span className="font-bold text-slate-900 text-sm">{currentMission.overnight ? 'Grand Déplacement' : 'Base de retour'}</span>
                                             </div>
                                         </div>
 
-                                        <div className={`p-6 rounded-[32px] border-2 transition-all flex flex-col justify-between ${currentMission.travel ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-300`}>
+                                        <div className={`p-6 rounded-[32px] border-2 transition-all flex flex-col justify-between ${currentMission.travel ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-400`}>
                                             <div className="flex justify-between items-start mb-4">
                                                 <div className="text-orange-600 font-black uppercase text-[10px] tracking-widest">Kilométrage</div>
                                                 <button onClick={()=>handleUpdate('travel', !currentMission.travel)} className={`w-12 h-6 rounded-full transition-all relative print:hidden ${currentMission.travel ? 'bg-orange-500' : 'bg-slate-300'}`}>
@@ -616,24 +629,24 @@ export default function App() {
                                             <div className="flex items-center gap-3">
                                                 <Car className={currentMission.travel ? 'text-orange-600' : 'text-slate-300'} size={24}/>
                                                 {currentMission.travel ? (
-                                                    <div className="flex gap-2 text-xs font-black">
-                                                        <input className="w-12 bg-transparent outline-none border-b border-orange-200 text-center text-slate-900" value={currentMission.kmStart || ''} placeholder="Départ" onChange={e=>handleUpdate('kmStart', e.target.value)} />
+                                                    <div className="flex gap-2 text-xs font-black text-slate-900">
+                                                        <input className="w-12 bg-transparent outline-none border-b border-orange-200 text-center" value={currentMission.kmStart || ''} placeholder="Départ" onChange={e=>handleUpdate('kmStart', e.target.value)} />
                                                         <span className="text-orange-300">/</span>
-                                                        <input className="w-12 bg-transparent outline-none border-b border-orange-200 text-center text-slate-900" value={currentMission.kmEnd || ''} placeholder="Arrivée" onChange={e=>handleUpdate('kmEnd', e.target.value)} />
+                                                        <input className="w-12 bg-transparent outline-none border-b border-orange-200 text-center" value={currentMission.kmEnd || ''} placeholder="Arrivée" onChange={e=>handleUpdate('kmEnd', e.target.value)} />
                                                     </div>
-                                                ) : <span className="font-bold text-slate-400 text-sm">Non suivi</span>}
+                                                ) : <span className="font-bold text-slate-400 text-sm uppercase tracking-tighter">Non suivi</span>}
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="space-y-8">
                                     <MapView location={currentMission.location} />
-                                    {/* SECTION CONTACTS OPTIMISEE */}
-                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300">
-                                        <div className="flex items-center justify-between text-indigo-600 mb-2">
+                                    {/* SECTION CONTACTS */}
+                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300 print:shadow-none">
+                                        <div className="flex items-center justify-between text-indigo-600">
                                             <div className="flex items-center gap-3">
                                               <Users size={24}/>
-                                              <h4 className="text-xs font-black uppercase tracking-widest">Interlocuteurs sur site</h4>
+                                              <h4 className="text-xs font-black uppercase tracking-widest">Interlocuteurs</h4>
                                             </div>
                                             <button onClick={()=>handleUpdate('contacts', [...(currentMission.contacts||[]), {name:'', phone:'', role:''}])} className="bg-indigo-600 text-white p-2 rounded-xl hover:bg-indigo-700 transition-all print:hidden"><UserPlus size={18}/></button>
                                         </div>
@@ -642,53 +655,44 @@ export default function App() {
                                                 <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative group animate-in slide-in-from-right-2 print:bg-white print:border-slate-200">
                                                     <button onClick={()=>{const n=[...currentMission.contacts]; n.splice(i,1); handleUpdate('contacts',n)}} className="absolute top-4 right-4 text-red-300 hover:text-red-500 transition-all print:hidden"><Trash2 size={16}/></button>
                                                     <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[8px] font-black text-slate-400 uppercase">Nom complet</label>
-                                                            <input className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-slate-900 outline-none focus:border-indigo-500" placeholder="Ex: Jean Dupont" value={contact.name} onChange={e=>{const n=[...currentMission.contacts]; n[i].name=e.target.value; handleUpdate('contacts',n)}} />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[8px] font-black text-slate-400 uppercase">Rôle</label>
-                                                            <input className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500" placeholder="Ex: Responsable Sécurité" value={contact.role} onChange={e=>{const n=[...currentMission.contacts]; n[i].role=e.target.value; handleUpdate('contacts',n)}} />
-                                                        </div>
+                                                        <input className="bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-slate-900 outline-none focus:border-indigo-500 print:border-none print:p-0" placeholder="Nom..." value={contact.name} onChange={e=>{const n=[...currentMission.contacts]; n[i].name=e.target.value; handleUpdate('contacts',n)}} />
+                                                        <input className="bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 print:border-none print:p-0" placeholder="Rôle..." value={contact.role} onChange={e=>{const n=[...currentMission.contacts]; n[i].role=e.target.value; handleUpdate('contacts',n)}} />
                                                     </div>
-                                                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
-                                                        <Phone size={14} className="text-slate-400"/>
-                                                        <input className="flex-1 bg-transparent text-xs font-black text-indigo-600 outline-none" placeholder="Numéro de téléphone..." value={contact.phone} onChange={e=>{const n=[...currentMission.contacts]; n[i].phone=e.target.value; handleUpdate('contacts',n)}} />
+                                                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 print:border-none print:p-0">
+                                                        <Phone size={14} className="text-slate-400 print:hidden"/>
+                                                        <input className="flex-1 bg-transparent text-xs font-black text-indigo-600 outline-none" placeholder="Téléphone..." value={contact.phone} onChange={e=>{const n=[...currentMission.contacts]; n[i].phone=e.target.value; handleUpdate('contacts',n)}} />
                                                     </div>
                                                 </div>
                                             ))}
-                                            {(currentMission.contacts || []).length === 0 && (
-                                                <p className="text-center text-[10px] text-slate-400 uppercase font-bold py-4">Aucun contact ajouté</p>
-                                            )}
                                         </div>
                                     </div>
-                                    {/* SECTION DOCUMENTS OPTIMISEE */}
+                                    {/* SECTION DOCUMENTS */}
                                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:hidden">
-                                        <div className="flex items-center gap-3 text-sky-600 mb-2">
+                                        <div className="flex items-center gap-3 text-sky-600">
                                             <FolderOpen size={24}/>
-                                            <h4 className="text-xs font-black uppercase tracking-widest">Documents Opérationnels</h4>
+                                            <h4 className="text-xs font-black uppercase tracking-widest">Documents cloud</h4>
                                         </div>
                                         <div className="space-y-4">
-                                            {(currentMission.documents || []).map((doc, i) => (
-                                                <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative group animate-in slide-in-from-right-2">
+                                            {(currentMission.documents || []).map((docItem, i) => (
+                                                <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative animate-in slide-in-from-right-2">
                                                     <div className="grid grid-cols-2 gap-3">
-                                                        <select className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-black text-slate-900 outline-none focus:border-sky-500" value={doc.type || ''} onChange={e=>{const n=[...currentMission.documents]; n[i].type=e.target.value; handleUpdate('documents',n)}}>
-                                                            <option value="">-- Type de doc --</option>
+                                                        <select className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-black text-slate-900 outline-none focus:border-sky-500" value={docItem.type || ''} onChange={e=>{const n=[...currentMission.documents]; n[i].type=e.target.value; handleUpdate('documents',n)}}>
+                                                            <option value="">-- Type --</option>
                                                             {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                                         </select>
-                                                        <input className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-bold text-slate-900 outline-none focus:border-sky-500" placeholder="Nom fichier..." value={doc.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} />
+                                                        <input className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-bold text-slate-900 outline-none focus:border-sky-500" placeholder="Nom..." value={docItem.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} />
                                                     </div>
                                                     <div className="flex gap-2">
                                                         <div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
                                                             <LinkIcon size={14} className="text-slate-400"/>
-                                                            <input className="flex-1 bg-transparent text-[9px] font-medium text-sky-600 outline-none" placeholder="Lien de visualisation (Drive/Cloud)..." value={doc.url} onChange={e=>{const n=[...currentMission.documents]; n[i].url=e.target.value; handleUpdate('documents',n)}} />
+                                                            <input className="flex-1 bg-transparent text-[9px] font-medium text-sky-600 outline-none" placeholder="Lien..." value={docItem.url} onChange={e=>{const n=[...currentMission.documents]; n[i].url=e.target.value; handleUpdate('documents',n)}} />
                                                         </div>
-                                                        <a href={doc.url} target="_blank" rel="noreferrer" className="bg-sky-100 p-2.5 rounded-xl text-sky-600 hover:bg-sky-600 hover:text-white transition-all"><Eye size={18}/></a>
+                                                        <a href={docItem.url} target="_blank" rel="noreferrer" className="bg-sky-100 p-2.5 rounded-xl text-sky-600 hover:bg-sky-600 hover:text-white transition-all"><Eye size={18}/></a>
                                                         <button onClick={()=>{const n=[...currentMission.documents]; n.splice(i,1); handleUpdate('documents',n)}} className="bg-red-50 p-2.5 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
                                                     </div>
                                                 </div>
                                             ))}
-                                            <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'', url:'https://', type:''}])} className="w-full py-5 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black uppercase text-[10px] tracking-widest hover:border-sky-300 hover:text-sky-500 transition-all">+ Ajouter un document</button>
+                                            <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'', url:'https://', type:''}])} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black uppercase text-[10px] tracking-widest hover:border-sky-500 transition-all">+ Ajouter Doc</button>
                                         </div>
                                     </div>
                                 </div>
@@ -697,56 +701,70 @@ export default function App() {
                     )}
 
                     {(activeTab === 'technical' || window.matchMedia('print').matches) && (
-                        <div className="space-y-10 animate-in fade-in duration-500 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
-                            <div className="grid md:grid-cols-3 gap-6 print:grid-cols-3 print:mb-8">
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
-                                    <Wind className="text-sky-500" size={28}/>
-                                    <div className="flex-1">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vent (km/h)</p>
-                                        <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} />
+                        <div className="space-y-10 animate-in fade-in duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100">
+                            {/* METEO SECTION */}
+                            <div className="flex flex-col md:flex-row gap-6 items-center mb-8">
+                                <div className="grid grid-cols-3 gap-6 flex-1 w-full print:grid-cols-3">
+                                    <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
+                                        <Wind className="text-sky-500" size={28}/>
+                                        <div className="flex-1">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vent (km/h)</p>
+                                            <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
+                                        <Thermometer className="text-orange-500" size={28}/>
+                                        <div className="flex-1">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Temp. (°C)</p>
+                                            <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
+                                        <CloudSun className="text-emerald-500" size={28}/>
+                                        <div className="flex-1">
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Indice KP</p>
+                                            <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
-                                    <Thermometer className="text-orange-500" size={28}/>
-                                    <div className="flex-1">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Temp. (°C)</p>
-                                        <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
-                                    <CloudSun className="text-emerald-500" size={28}/>
-                                    <div className="flex-1">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Indice KP</p>
-                                        <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} />
-                                    </div>
-                                </div>
+                                <button onClick={refreshWeather} disabled={weatherLoading} className="bg-slate-900 text-white p-6 rounded-[32px] shadow-xl hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-50 print:hidden">
+                                    {weatherLoading ? <Loader2 size={24} className="animate-spin"/> : <RefreshCw size={24}/>}
+                                </button>
                             </div>
                             <div className="grid md:grid-cols-2 gap-12 print:grid-cols-1">
-                                <div className="bg-slate-900 p-10 rounded-[48px] text-white space-y-8 print:bg-white print:text-slate-900 print:p-0 print:border-none">
+                                <div className="bg-slate-900 p-10 rounded-[48px] text-white space-y-10 shadow-2xl print:bg-white print:text-slate-900 print:p-0 print:shadow-none print:border-none">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4 text-orange-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-slate-900">
                                             <Plane size={24}/><h4 className="font-black uppercase tracking-widest text-xs">Consignes Vol / ATC</h4>
                                         </div>
-                                        <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Détails radio..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea>
+                                        <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto print:text-base" placeholder="Protocoles radio, NOTAM, zones P-R-D..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea>
                                     </div>
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4 text-emerald-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-slate-900">
-                                            <Wrench size={24}/><h4 className="font-black uppercase tracking-widest text-xs">Notes Techniques</h4>
+                                            <Wrench size={24}/><h4 className="font-black uppercase tracking-widest text-xs">Objectifs Techniques</h4>
                                         </div>
-                                        <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
+                                        <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto print:text-base" placeholder="Précision RTK, chevauchement, capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
                                     </div>
+                                </div>
+                                <div className="bg-blue-50 p-10 rounded-[48px] border-2 border-blue-100 print:bg-white print:border-slate-300 print:p-8">
+                                    <h4 className="font-black text-blue-600 text-[10px] uppercase tracking-widest mb-6 print:text-slate-900">Préparation Opérationnelle</h4>
+                                    <ul className="space-y-5 text-xs text-blue-900 font-bold uppercase tracking-tight print:text-slate-700 print:text-[10px]">
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0 print:text-slate-900"/> Consultation Geoportail indispensable.</li>
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0 print:text-slate-900"/> Déclaration AlphaTango active.</li>
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0 print:text-slate-900"/> Balisage ZET requis en zone peuplée.</li>
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0 print:text-slate-900"/> ERP (Plan Urgence) connu de l'équipe.</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {activeTab === 'check' && (
-                        <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
+                    {(activeTab === 'check' || window.matchMedia('print').matches) && (
+                        <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100">
                             <div className="bg-slate-900 text-white p-12 rounded-[56px] relative overflow-hidden print:bg-white print:text-slate-900 print:p-0 print:shadow-none">
-                                <div className="absolute -bottom-10 -right-10 opacity-5 print:hidden"><Shield size={200}/></div>
                                 <div className="flex justify-between items-center border-b border-slate-800 pb-6 mb-8 print:border-slate-900 print:pb-2 print:mb-6">
-                                    <div className="text-emerald-400 font-black text-4xl tracking-tighter uppercase print:text-slate-900 print:text-2xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
-                                    <select className="bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border border-slate-700 outline-none focus:border-sky-500 print:hidden" value={currentMission.scenario || 'A3'} onChange={e => handleUpdate('scenario', e.target.value)}>
+                                    <div className="text-emerald-400 font-black text-4xl tracking-tighter uppercase print:text-slate-900 print:text-3xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
+                                    <select className="bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border border-slate-700 outline-none print:hidden" value={currentMission.scenario || 'A3'} onChange={e => handleUpdate('scenario', e.target.value)}>
                                         <option value="A1">Open A1</option>
                                         <option value="A2">Open A2</option>
                                         <option value="A3">Open A3</option>
@@ -755,20 +773,20 @@ export default function App() {
                                     </select>
                                 </div>
                                 <p className="text-slate-400 text-sm mb-12 leading-relaxed font-medium print:text-slate-500 print:mb-6">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
-                                <div className="text-sm border-l-4 border-sky-500 pl-6"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 print:text-slate-900">Périmètre ZET</strong><span className="font-bold print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
+                                <div className="text-sm border-l-4 border-sky-500 pl-6"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 print:text-slate-900">Règle ZET</strong><span className="font-bold print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
                             </div>
                             <div className="space-y-6">
                                 <div className="flex justify-between items-end mb-4 px-2 print:mb-4">
                                     <div>
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist de Sécurité</h4>
-                                        <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-lg leading-none`}>{safetyScore}%</span>
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Vérifications de Sécurité</h4>
+                                        <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-xl leading-none`}>{safetyScore}%</span>
                                     </div>
-                                    <button onClick={() => { const all = {}; activeChecklistItems.forEach(i => all[i.k] = true); handleUpdate('checklist', all); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-500 transition-all active:scale-95 print:hidden">Tout Valider</button>
+                                    <button onClick={() => { const all = {}; activeChecklistItems.forEach(i => all[i.k] = true); handleUpdate('checklist', all); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 print:hidden">Tout Valider</button>
                                 </div>
                                 <div className="space-y-3 print:space-y-2">
                                     {activeChecklistItems.map(i => (
-                                        <div key={i.k} onClick={() => handleUpdate('checklist', {...(currentMission.checklist||{}), [i.k]: !currentMission.checklist?.[i.k]})} className={`flex items-center gap-5 p-5 rounded-[32px] border-2 cursor-pointer transition-all active:scale-[0.98] ${currentMission.checklist?.[i.k] ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'} print:p-2 print:border-none print:bg-white`}>
-                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 transition-all ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 text-transparent'} print:w-4 print:h-4 print:border-slate-900`}>
+                                        <div key={i.k} onClick={() => handleUpdate('checklist', {...(currentMission.checklist||{}), [i.k]: !currentMission.checklist?.[i.k]})} className={`flex items-center gap-5 p-5 rounded-[32px] border-2 cursor-pointer transition-all ${currentMission.checklist?.[i.k] ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100'} print:p-2 print:border-none print:bg-white`}>
+                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-300 text-transparent'} print:w-4 print:h-4 print:border-slate-900`}>
                                                 <Check size={18} strokeWidth={4} className="print:hidden"/>
                                             </div>
                                             <span className={`font-black uppercase text-xs tracking-tight ${currentMission.checklist?.[i.k] ? 'text-emerald-900' : 'text-slate-400'} print:text-slate-900 print:text-[10px]`}>{i.l}</span>
@@ -779,46 +797,34 @@ export default function App() {
                         </div>
                     )}
 
-                    {activeTab === 'flight' && (
-                        <div className="animate-in fade-in duration-500 space-y-10 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Logbook Opérationnel</h4>
-                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none">
+                    {(activeTab === 'flight' || window.matchMedia('print').matches) && (
+                        <div className="animate-in fade-in duration-500 space-y-10 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Journal des Vols (Logbook)</h4>
+                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none print:shadow-none">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 print:bg-white print:text-slate-900 print:border-slate-900">
-                                        <tr><th className="p-7"># Vol</th><th className="p-7">Décollage / Atterrissage</th><th className="p-7">Batterie</th><th className="p-7 text-right">Durée</th></tr>
+                                        <tr><th className="p-7">#</th><th className="p-7">Horaires Vol</th><th className="p-7">Batt.</th><th className="p-7 text-right">Durée</th></tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-200">
                                         {(currentMission.logs || []).map((l, i) => (
                                             <tr key={l.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white">
                                                 <td className="p-7 text-slate-300 font-black print:text-slate-900">{i+1}</td>
                                                 <td className="p-7 font-mono text-slate-500 print:text-slate-700 text-xs">{l.start || '--:--'} ➔ {l.end || '--:--'}</td>
-                                                <td className="p-7 text-sky-600 uppercase text-xs font-black tracking-widest print:text-slate-900">{l.battery}%</td>
+                                                <td className="p-7 text-sky-600 font-black print:text-slate-900">{l.battery}%</td>
                                                 <td className="p-7 text-right font-black text-slate-900 text-lg tabular-nums">{formatDuration(calculateDuration(l.start, l.end))}</td>
                                             </tr>
                                         ))}
-                                        {(currentMission.logs || []).length === 0 && (
-                                            <tr><td colSpan="4" className="p-20 text-center text-slate-300 font-black uppercase text-xs tracking-widest print:text-slate-900">Aucun vol enregistré</td></tr>
-                                        )}
                                     </tbody>
                                 </table>
                             </div>
-                            <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Saisie manuelle'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden">+ Saisie manuelle d'un vol</button>
                         </div>
                     )}
 
-                    {activeTab === 'sign' && (
-                        <div className="animate-in fade-in duration-500 space-y-12 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
-                            <div className="flex flex-col md:flex-row justify-between items-center bg-slate-900 p-12 rounded-[56px] text-white gap-10 shadow-2xl relative overflow-hidden print:hidden">
-                                <div className="absolute -left-10 -bottom-10 opacity-5"><QrCode size={250}/></div>
-                                <div className="relative z-10 text-center md:text-left">
-                                    <h3 className="font-black text-4xl uppercase tracking-tighter leading-none mb-3">Validation Mobile</h3>
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Faites signer votre client sur son propre smartphone.</p>
-                                </div>
-                                <button onClick={() => setQrModal(true)} className="relative z-10 bg-white text-slate-900 px-12 py-5 rounded-[32px] flex items-center gap-4 font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"><QrCode size={24}/> Afficher le QR Code</button>
-                            </div>
+                    {(activeTab === 'sign' || window.matchMedia('print').matches) && (
+                        <div className="animate-in fade-in duration-500 space-y-12 print:mt-16">
                             <div className="grid md:grid-cols-2 gap-10 print:grid-cols-2">
                                 <SignaturePad title="Visa Télépilote (Aerothau)" savedData={currentMission.signaturePilote} onSave={d => handleUpdate('signaturePilote', d)} />
-                                <SignaturePad title="Visa Client / Donneur d'ordre" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
+                                <SignaturePad title="Visa Client / Représentant" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
                             </div>
                         </div>
                     )}
@@ -830,8 +836,8 @@ export default function App() {
             <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300" onClick={()=>setQrModal(false)}>
                 <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-950 transition-colors active:scale-90"><X size={36}/></button>
-                    <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none">Validation Client</h3>
-                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6">Signature sécurisée sans contact.</p>
+                    <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none">Validation Mobile</h3>
+                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6 text-center">Le client doit scanner ce code avec son mobile pour signer.</p>
                     <div className="bg-white p-10 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply" alt="QR Code Signature" />
                     </div>
@@ -863,7 +869,7 @@ const LoginScreen = () => {
             <div className="bg-white p-12 md:p-16 rounded-[64px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
                 <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" onError={(e) => { e.target.style.display='none'; }} />
                 <h2 className="text-4xl font-black mb-1 uppercase tracking-tighter leading-none">Pilote Manager</h2>
-                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest">Aerothau Operational Center</p>
+                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center">Aerothau Operational Center</p>
                 <form onSubmit={login} className="space-y-6 text-left">
                     <div className="space-y-1">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
