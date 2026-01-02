@@ -61,7 +61,9 @@ import {
   FolderOpen,
   Eye,
   UserPlus,
-  RefreshCw
+  RefreshCw,
+  MessageSquare,
+  AlertOctagon
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -131,6 +133,13 @@ const SCENARIO_INFOS = {
 
 const MISSION_TYPES = ['Inspection Technique', 'Photogrammétrie', 'Audiovisuel', 'Nettoyage (AirFlyClean)', 'Relevé Lidars', 'Thermographie'];
 const DOC_TYPES = ['Arrêté Préfectoral', 'Protocole ATC', 'Assurance RC', 'DNC Pilote', 'Plan de prévention', 'Autre'];
+const MISSION_STATUS = [
+    { value: 'En cours', color: 'bg-sky-500', text: 'text-sky-600', border: 'border-sky-200' },
+    { value: 'Validé', color: 'bg-emerald-500', text: 'text-emerald-600', border: 'border-emerald-200' },
+    { value: 'Reporté', color: 'bg-amber-500', text: 'text-amber-600', border: 'border-amber-200' },
+    { value: 'Annulé', color: 'bg-red-500', text: 'text-red-600', border: 'border-red-200' }
+];
+
 const BASE_CHECKLIST = [
   {k:'meteo',l:'Météo / Vent ok'}, {k:'zet',l:'Balisage ZET'}, {k:'auth',l:'Protocoles / Autorisations'}, 
   {k:'notam',l:'NOTAM / Geoportail'}, {k:'drone_state',l:'État mécanique'}, {k:'batteries',l:'Batteries'}, 
@@ -188,8 +197,8 @@ const LoginScreen = () => {
         <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
             <div className="bg-white p-12 md:p-16 rounded-[64px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
                 <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" onError={(e) => { e.target.style.display='none'; }} />
-                <h2 className="text-4xl font-black mb-1 uppercase tracking-tighter leading-none">Pilote Manager</h2>
-                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center text-black">Aerothau Operational Center</p>
+                <h2 className="text-4xl font-black mb-1 uppercase tracking-tighter leading-none text-slate-900">Pilote Manager</h2>
+                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center">Aerothau Operational Center</p>
                 <form onSubmit={login} className="space-y-6 text-left">
                     <div className="space-y-1 text-black font-black">
                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 leading-none">Email</label>
@@ -289,33 +298,47 @@ const SignaturePad = ({ title, onSave, savedData }) => {
 
   const getCoords = (e) => {
     const rect = canvasRef.current.getBoundingClientRect();
-    const scaleX = canvasRef.current.width / rect.width;
-    const scaleY = canvasRef.current.height / rect.height;
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
+    return { 
+        x: (clientX - rect.left) * (canvasRef.current.width / rect.width), 
+        y: (clientY - rect.top) * (canvasRef.current.height / rect.height) 
+    };
   };
 
   const startDrawing = (e) => {
-    if (e.cancelable) e.preventDefault();
-    const ctx = canvasRef.current.getContext('2d');
     const { x, y } = getCoords(e);
-    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineWidth = 3; ctx.strokeStyle = "#0f172a"; ctx.lineCap = "round";
-    setIsDrawing(true); setIsEmpty(false);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#0f172a";
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    setIsDrawing(true);
+    setIsEmpty(false);
   };
 
   const draw = (e) => {
     if (!isDrawing) return;
-    if (e.cancelable) e.preventDefault();
-    const ctx = canvasRef.current.getContext('2d');
     const { x, y } = getCoords(e);
-    ctx.lineTo(x, y); ctx.stroke();
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (isDrawing) {
+      setIsDrawing(false);
+      onSave(canvasRef.current.toDataURL());
+    }
   };
 
   const clear = () => {
     const ctx = canvasRef.current.getContext('2d');
-    ctx.clearRect(0,0,600,300);
-    onSave(null); setIsEmpty(true);
+    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    onSave(null);
+    setIsEmpty(true);
   };
 
   return (
@@ -325,8 +348,22 @@ const SignaturePad = ({ title, onSave, savedData }) => {
         <button onClick={clear} className="text-[10px] text-red-500 font-black print:hidden uppercase leading-none">Effacer</button>
       </div>
       <div className="relative border-2 border-dashed border-slate-200 rounded-[24px] bg-slate-50 h-32 md:h-40 w-full touch-none overflow-hidden print:bg-white print:border-slate-300">
-        {savedData ? <img src={savedData} className="w-full h-full object-contain" alt="Signature" /> : (
-          <canvas ref={canvasRef} width={600} height={300} className="w-full h-full cursor-crosshair print:hidden" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => {setIsDrawing(false); onSave(canvasRef.current.toDataURL());}} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => {setIsDrawing(false); onSave(canvasRef.current.toDataURL());}} />
+        {savedData ? (
+          <img src={savedData} className="w-full h-full object-contain" alt="Signature" />
+        ) : (
+          <canvas
+            ref={canvasRef}
+            width={600}
+            height={300}
+            className="w-full h-full cursor-crosshair print:hidden"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={(e) => { e.preventDefault(); startDrawing(e); }}
+            onTouchMove={(e) => { e.preventDefault(); draw(e); }}
+            onTouchEnd={(e) => { e.preventDefault(); stopDrawing(); }}
+          />
         )}
         {isEmpty && !savedData && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 text-[10px] font-black uppercase tracking-widest leading-none">Signer ici</div>}
       </div>
@@ -581,7 +618,7 @@ export default function App() {
     const m = { 
         ref: `ATH-${new Date().getFullYear()}-${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`,
         date: new Date().toISOString().split('T')[0], title: '', client: '', location: '', type: 'Inspection Technique', 
-        category: 'Open', scenario: 'A3', checklist: {}, contacts: [], logs: [], documents: [], 
+        category: 'Open', scenario: 'A3', status: 'En cours', debriefing: '', checklist: {}, contacts: [], logs: [], documents: [], 
         flightNotes: '', techNotes: '', meteoVent: '', meteoTemp: '', meteoKP: '', 
         overnight: false, travel: false, kmStart: '', kmEnd: '', createdAt: serverTimestamp()
     };
@@ -634,17 +671,21 @@ export default function App() {
                 <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest leading-none">Actif</div>
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {missions.map(m => (
-                <div key={m.id} onClick={() => {setCurrentMission(m); setView('edit');}} className="bg-white p-8 rounded-[48px] shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer border border-slate-100 group relative overflow-hidden text-left">
-                    <div className="flex justify-between mb-5 leading-none">
-                      <span className="text-[10px] font-black tracking-widest bg-slate-50 text-slate-400 px-4 py-1.5 rounded-full border border-slate-100 uppercase">{m.ref}</span>
-                      <span className="text-[9px] font-black uppercase text-sky-600 px-3 py-1 bg-sky-50 rounded-full">{m.scenario}</span>
-                    </div>
-                    <h3 className="font-black text-2xl text-slate-900 mb-2 uppercase leading-tight group-hover:text-sky-600 transition-colors tracking-tighter">{m.title || m.client || "Nouvelle Mission"}</h3>
-                    <p className="text-xs text-slate-500 font-bold flex items-center gap-2 uppercase tracking-wide leading-none"><MapPin size={16} className="text-slate-300"/>{m.location || "Non localisée"}</p>
-                    {m.overnight && <span className="absolute top-10 -right-6 bg-indigo-500 text-white text-[8px] font-black px-8 py-1 rotate-45 uppercase shadow-sm leading-none">Découcher</span>}
-                </div>
-                ))}
+                {missions.map(m => {
+                    const currentStatus = MISSION_STATUS.find(s => s.value === m.status) || MISSION_STATUS[0];
+                    return (
+                        <div key={m.id} onClick={() => {setCurrentMission(m); setView('edit');}} 
+                            className={`bg-white p-8 rounded-[48px] shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all cursor-pointer border-2 ${currentStatus.border} group relative overflow-hidden text-left`}>
+                            <div className="flex justify-between mb-5 leading-none">
+                                <span className="text-[10px] font-black tracking-widest bg-slate-50 text-slate-400 px-4 py-1.5 rounded-full border border-slate-100 uppercase">{m.ref}</span>
+                                <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full text-white ${currentStatus.color}`}>{m.status}</span>
+                            </div>
+                            <h3 className="font-black text-2xl text-slate-900 mb-2 uppercase leading-tight group-hover:text-sky-600 transition-colors tracking-tighter">{m.title || m.client || "Nouvelle Mission"}</h3>
+                            <p className="text-xs text-slate-500 font-bold flex items-center gap-2 uppercase tracking-wide leading-none"><MapPin size={16} className="text-slate-300"/>{m.location || "Non localisée"}</p>
+                            {m.overnight && <span className="absolute top-10 -right-6 bg-indigo-500 text-white text-[8px] font-black px-8 py-1 rotate-45 uppercase shadow-sm leading-none">Découcher</span>}
+                        </div>
+                    );
+                })}
             </div>
           </div>
         )}
@@ -752,7 +793,7 @@ export default function App() {
                                         {(currentMission.contacts || []).map((contact, i) => (
                                             <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative group animate-in slide-in-from-right-2 print:bg-white print:border-slate-200">
                                                 <button onClick={()=>{const n=[...currentMission.contacts]; n.splice(i,1); handleUpdate('contacts',n)}} className="absolute top-4 right-4 text-red-300 hover:text-red-500 transition-all print:hidden leading-none"><Trash2 size={16}/></button>
-                                                <div className="grid grid-cols-2 gap-4 leading-none"><input className="bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-black outline-none focus:border-indigo-500 print:border-none print:p-0" placeholder="Nom..." value={contact.name} onChange={e=>{const n=[...currentMission.contacts]; n[i].name=e.target.value; handleUpdate('contacts',n)}} /><input className="bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-black outline-none focus:border-indigo-500 print:border-none print:p-0" placeholder="Rôle..." value={contact.role} onChange={e=>{const n=[...currentMission.contacts]; n[i].role=e.target.value; handleUpdate('contacts',n)}} /></div>
+                                                <div className="grid grid-cols-2 gap-4 leading-none"><input className="bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-black outline-none focus:border-indigo-500 print:border-none print:p-0 print:text-base" placeholder="Nom..." value={contact.name} onChange={e=>{const n=[...currentMission.contacts]; n[i].name=e.target.value; handleUpdate('contacts',n)}} /><input className="bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-black outline-none focus:border-indigo-500 print:border-none print:p-0 print:text-slate-500" placeholder="Rôle..." value={contact.role} onChange={e=>{const n=[...currentMission.contacts]; n[i].role=e.target.value; handleUpdate('contacts',n)}} /></div>
                                                 <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 print:border-none print:p-0 leading-none"><Phone size={14} className="text-slate-400 print:hidden"/><input className="flex-1 bg-transparent text-xs font-black text-indigo-600 outline-none" placeholder="Tél..." value={contact.phone} onChange={e=>{const n=[...currentMission.contacts]; n[i].phone=e.target.value; handleUpdate('contacts',n)}} /></div>
                                             </div>
                                         ))}
@@ -831,8 +872,24 @@ export default function App() {
                         <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Saisie manuelle'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden leading-none">+ Saisie manuelle d'un vol</button>
                     </div>
 
-                    {/* SECTION SIGNATURES */}
+                    {/* SECTION VALIDATION / SIGNATURES */}
                     <div className={`${activeTab === 'sign' ? 'block' : 'hidden print:block'} animate-in fade-in duration-500 space-y-12 print:mt-16 text-left`}>
+                        <div className="grid md:grid-cols-2 gap-8 print:grid-cols-1">
+                            <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:border-slate-300">
+                                <div className="flex items-center gap-3 text-indigo-600 leading-none"><MessageSquare size={24}/><h4 className="text-xs font-black uppercase tracking-widest leading-none">Débriefing Mission</h4></div>
+                                <textarea className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl outline-none focus:border-indigo-500 h-40 text-sm font-medium leading-relaxed text-black print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Observations, incidents, points à surveiller..." value={currentMission.debriefing || ''} onChange={e=>handleUpdate('debriefing', e.target.value)}></textarea>
+                            </div>
+                            <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:border-slate-300 flex flex-col justify-center">
+                                <div className="flex items-center gap-3 text-emerald-600 leading-none"><CheckCircle2 size={24}/><h4 className="text-xs font-black uppercase tracking-widest leading-none">Statut de la mission</h4></div>
+                                <div className="grid grid-cols-2 gap-3 print:hidden">
+                                    {MISSION_STATUS.map(s => (
+                                        <button key={s.value} onClick={()=>handleUpdate('status', s.value)} className={`p-4 rounded-2xl font-black text-[10px] uppercase transition-all active:scale-95 border-2 ${currentMission.status === s.value ? `${s.color} text-white ${s.border}` : `bg-white text-slate-400 border-slate-100 hover:border-slate-200`}`}>{s.value}</button>
+                                    ))}
+                                </div>
+                                <div className="hidden print:block"><p className="text-xl font-black text-black">STATUT : {currentMission.status}</p></div>
+                            </div>
+                        </div>
+
                         <div className="grid md:grid-cols-2 gap-10 print:grid-cols-2">
                             <SignaturePad title="Visa Télépilote (Aerothau)" savedData={currentMission.signaturePilote} onSave={d => handleUpdate('signaturePilote', d)} />
                             <SignaturePad title="Visa Client / Représentant" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
@@ -847,7 +904,7 @@ export default function App() {
             <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300 leading-none" onClick={()=>setQrModal(false)}>
                 <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300 leading-none" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-950 active:scale-90 transition-all leading-none"><X size={36}/></button>
-                    <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none">Validation Mobile</h3>
+                    <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none text-slate-900">Validation Mobile</h3>
                     <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6 text-center leading-tight">Le client doit scanner ce code avec son mobile pour signer l'intervention.</p>
                     <div className="bg-white p-10 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center leading-none">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply leading-none" alt="QR" />
