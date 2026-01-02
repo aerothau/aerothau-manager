@@ -352,6 +352,12 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
         return () => clearInterval(timerRef.current);
     }, [isFlying, startTime]);
 
+    const formatTimer = (sec) => {
+        const m = Math.floor(sec / 60).toString().padStart(2, '0');
+        const s = (sec % 60).toString().padStart(2, '0');
+        return `${m}:${s}`;
+    };
+
     const handleFlight = () => {
         if (!isFlying) {
             setStartTime(Date.now());
@@ -605,7 +611,7 @@ export default function App() {
             <>
               <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 ${view === 'calendar' ? 'bg-sky-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'} transition-all`}><CalendarIcon size={22}/></button>
               <button onClick={()=>setIsAdminView(true)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-all shadow-md"><Shield size={22}/></button>
-              <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-50 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
+              <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
             </>
           ) : view === 'edit' ? (
             <div className="flex gap-2">
@@ -737,7 +743,7 @@ export default function App() {
                             </div>
                             <div className="space-y-8">
                                 <MapView location={currentMission.location} />
-                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300">
+                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300 print:shadow-none">
                                     <div className="flex items-center justify-between text-indigo-600">
                                         <div className="flex items-center gap-3 leading-none"><Users size={24}/><h4 className="text-xs font-black uppercase tracking-widest leading-none">Interlocuteurs</h4></div>
                                         <button onClick={()=>handleUpdate('contacts', [...(currentMission.contacts||[]), {name:'', phone:'', role:''}])} className="bg-indigo-600 text-white p-2 rounded-xl hover:bg-indigo-700 transition-all print:hidden shadow-lg leading-none"><UserPlus size={18}/></button>
@@ -752,6 +758,18 @@ export default function App() {
                                         ))}
                                     </div>
                                 </div>
+                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:hidden">
+                                    <div className="flex items-center gap-3 text-sky-600 mb-2 leading-none"><FolderOpen size={24}/><h4 className="text-xs font-black uppercase tracking-widest leading-none">Documents cloud</h4></div>
+                                    <div className="space-y-4">
+                                        {(currentMission.documents || []).map((docItem, i) => (
+                                            <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative group animate-in slide-in-from-right-2">
+                                                <div className="grid grid-cols-2 gap-3 leading-none"><select className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-black text-slate-900 outline-none focus:border-sky-500" value={docItem.type || ''} onChange={e=>{const n=[...currentMission.documents]; n[i].type=e.target.value; handleUpdate('documents',n)}}><option value="">-- Type --</option>{DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select><input className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-bold text-slate-900 outline-none focus:border-sky-500" placeholder="Nom..." value={docItem.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} /></div>
+                                                <div className="flex gap-2 leading-none"><div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 leading-none"><LinkIcon size={14} className="text-slate-400"/><input className="flex-1 bg-transparent text-[9px] font-medium text-sky-600 outline-none" placeholder="Lien..." value={docItem.url} onChange={e=>{const n=[...currentMission.documents]; n[i].url=e.target.value; handleUpdate('documents',n)}} /></div><a href={docItem.url} target="_blank" rel="noreferrer" className="bg-sky-100 p-2.5 rounded-xl text-sky-600 hover:bg-sky-600 hover:text-white transition-all"><Eye size={18}/></a><button onClick={()=>{const n=[...currentMission.documents]; n.splice(i,1); handleUpdate('documents',n)}} className="bg-red-50 p-2.5 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all leading-none"><Trash2 size={18}/></button></div>
+                                            </div>
+                                        ))}
+                                        <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'', url:'https://', type:''}])} className="w-full py-5 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black uppercase text-[10px] tracking-widest hover:border-sky-300 hover:text-sky-500 transition-all leading-none">+ Ajouter Dossier</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -759,16 +777,10 @@ export default function App() {
                     {/* SECTION TECHNIQUE / METEO */}
                     <div className={`${activeTab === 'technical' ? 'block' : 'hidden print:block'} space-y-10 animate-in fade-in duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
                         <div className="flex flex-col md:flex-row gap-6 items-center mb-8 print:hidden leading-none">
-                            <div className="grid grid-cols-3 gap-6 flex-1 w-full">
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4">
-                                    <Wind className="text-sky-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Vent</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} /></div>
-                                </div>
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4">
-                                    <Thermometer className="text-orange-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Temp.</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} /></div>
-                                </div>
-                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4">
-                                    <CloudSun className="text-emerald-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">KP</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} /></div>
-                                </div>
+                            <div className="grid grid-cols-3 gap-6 flex-1 w-full leading-none">
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><Wind className="text-sky-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Vent</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} /></div></div>
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><Thermometer className="text-orange-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Temp.</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} /></div></div>
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 leading-none"><CloudSun className="text-emerald-500" size={28}/><div className="flex-1 leading-none"><p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">KP</p><input className="w-full bg-transparent font-black text-lg outline-none text-black leading-none" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} /></div></div>
                             </div>
                             <button onClick={refreshWeather} disabled={weatherLoading} className="bg-slate-900 text-white p-6 rounded-[32px] shadow-xl hover:bg-slate-800 active:scale-95 disabled:opacity-50 leading-none">{weatherLoading ? <Loader2 size={24} className="animate-spin"/> : <RefreshCw size={24}/>}</button>
                         </div>
@@ -779,8 +791,8 @@ export default function App() {
                         </div>
                         <div className="grid md:grid-cols-2 gap-12 print:grid-cols-1">
                             <div className="bg-slate-900 p-10 rounded-[48px] text-white space-y-10 shadow-2xl print:bg-white print:text-black print:p-0 print:shadow-none print:border-none text-left">
-                                <div className="space-y-4"><div className="flex items-center gap-4 text-orange-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-black leading-none"><Plane size={24}/><h4 className="font-black uppercase tracking-widest text-xs leading-none">Consignes Vol / ATC</h4></div><textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="NOTAM, zones..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea></div>
-                                <div className="space-y-4"><div className="flex items-center gap-4 text-emerald-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-black leading-none"><Wrench size={24}/><h4 className="font-black uppercase tracking-widest text-xs leading-none">Notes Techniques</h4></div><textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea></div>
+                                <div className="space-y-4"><div className="flex items-center gap-4 text-orange-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-black leading-none"><Plane size={24}/><h4 className="font-black uppercase tracking-widest text-xs leading-none">Consignes Vol / ATC</h4></div><textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto print:text-base" placeholder="Protocoles radio, NOTAM..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea></div>
+                                <div className="space-y-4"><div className="flex items-center gap-4 text-emerald-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-black leading-none"><Wrench size={24}/><h4 className="font-black uppercase tracking-widest text-xs leading-none">Notes Techniques</h4></div><textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto print:text-base" placeholder="Capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea></div>
                             </div>
                         </div>
                     </div>
@@ -788,7 +800,7 @@ export default function App() {
                     {/* SECTION SECURITE */}
                     <div className={`${activeTab === 'check' ? 'block' : 'hidden print:block'} grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
                         <div className="bg-slate-900 text-white p-12 rounded-[56px] relative overflow-hidden print:bg-white print:text-black print:p-0 print:shadow-none">
-                            <div className="flex justify-between items-center border-b border-slate-800 pb-6 mb-8 print:border-slate-900 print:pb-2 print:mb-6">
+                            <div className="flex justify-between items-center border-b border-slate-800 pb-6 mb-8 print:border-slate-900 print:pb-2 print:mb-6 leading-none">
                                 <div className="text-emerald-400 font-black text-4xl tracking-tighter uppercase print:text-black print:text-3xl leading-none">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
                                 <select className="bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border border-slate-700 outline-none print:hidden leading-none" value={currentMission.scenario || 'A3'} onChange={e => handleUpdate('scenario', e.target.value)}>
                                     <option value="A1">Open A1</option><option value="A2">Open A2</option><option value="A3">Open A3</option><option value="STS-01">STS-01</option><option value="STS-02">STS-02</option>
@@ -812,10 +824,11 @@ export default function App() {
 
                     {/* SECTION LOGBOOK */}
                     <div className={`${activeTab === 'flight' ? 'block' : 'hidden print:block'} animate-in fade-in duration-500 space-y-10 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
-                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-black leading-none">Journal des Vols</h4>
-                        <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none leading-none">
-                            <table className="w-full text-left leading-none"><thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 print:bg-white print:text-black print:border-black leading-none"><tr><th className="p-7">#</th><th className="p-7">Heures</th><th className="p-7">Batt.</th><th className="p-7 text-right">Durée</th></tr></thead><tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-200 text-black leading-none">{(currentMission.logs || []).map((l, i) => (<tr key={l.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white leading-none"><td className="p-7 text-slate-300 font-black print:text-black leading-none">{i+1}</td><td className="p-7 font-mono text-slate-500 print:text-slate-700 text-xs leading-none">{l.start || '--:--'} ➔ {l.end || '--:--'}</td><td className="p-7 text-sky-600 font-black print:text-black leading-none">{l.battery}%</td><td className="p-7 text-right font-black text-black text-lg tabular-nums leading-none">{formatDuration(calculateDuration(l.start, l.end))}</td></tr>))}</tbody></table>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-black leading-none">Journal des Vols (Logbook)</h4>
+                        <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none print:shadow-none leading-none">
+                            <table className="w-full text-left leading-none"><thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 print:bg-white print:text-black print:border-black leading-none"><tr><th className="p-7">#</th><th className="p-7">Heures Vol</th><th className="p-7">Batt.</th><th className="p-7 text-right">Durée</th><th className="p-7 text-center print:hidden">Action</th></tr></thead><tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-200 text-black leading-none">{(currentMission.logs || []).map((l, i) => (<tr key={l.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white leading-none"><td className="p-7 text-slate-300 font-black print:text-black leading-none">{i+1}</td><td className="p-7 font-mono text-slate-500 print:text-slate-700 text-xs leading-none">{l.start || '--:--'} ➔ {l.end || '--:--'}</td><td className="p-7 text-sky-600 font-black print:text-black leading-none">{l.battery}%</td><td className="p-7 text-right font-black text-black text-lg tabular-nums leading-none">{formatDuration(calculateDuration(l.start, l.end))}</td><td className="p-7 text-center print:hidden leading-none"><button onClick={() => { const nl = [...currentMission.logs]; nl.splice(i, 1); handleUpdate('logs', nl); }} className="text-red-300 hover:text-red-500 active:scale-90 leading-none"><Trash2 size={18}/></button></td></tr>))}</tbody></table>
                         </div>
+                        <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Saisie manuelle'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden leading-none">+ Saisie manuelle d'un vol</button>
                     </div>
 
                     {/* SECTION SIGNATURES */}
@@ -831,13 +844,13 @@ export default function App() {
 
         {/* MODAL QR CODE */}
         {qrModal && (
-            <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300" onClick={()=>setQrModal(false)}>
-                <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300" onClick={e=>e.stopPropagation()}>
+            <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300 leading-none" onClick={()=>setQrModal(false)}>
+                <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300 leading-none" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-950 active:scale-90 transition-all leading-none"><X size={36}/></button>
                     <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none">Validation Mobile</h3>
-                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6 text-center leading-tight">Scanner pour signer l'intervention.</p>
+                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6 text-center leading-tight">Le client doit scanner ce code avec son mobile pour signer l'intervention.</p>
                     <div className="bg-white p-10 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center leading-none">
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply" alt="QR" />
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply leading-none" alt="QR" />
                     </div>
                     <button onClick={()=>setQrModal(false)} className="w-full py-6 bg-slate-950 text-white rounded-[32px] font-black text-lg shadow-xl uppercase active:scale-95 transition-all leading-none">Fermer</button>
                 </div>
