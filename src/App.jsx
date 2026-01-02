@@ -56,7 +56,7 @@ import {
   Thermometer,
   CloudSun,
   Car,
-  BarChart3,
+  Moon,
   CheckCircle2
 } from 'lucide-react';
 
@@ -74,10 +74,9 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Chemin relatif pour GitHub Pages
 const LOGO_URL = "logo.png"; 
 
-// --- CONSTANTES ---
+// --- CONSTANTES MÉTIER ---
 const SCENARIO_INFOS = {
     'A1': { title: "Open A1", description: "Survol de personnes isolées possible (pas de rassemblement).", zet: "ZET: Éviter le survol. Pas de distance minimale." },
     'A2': { title: "Open A2", description: "Vol proximité personnes.", zet: "ZET: 30m des tiers (5m si lent)." },
@@ -121,6 +120,12 @@ const formatDuration = (minutes) => {
   return `${h > 0 ? h + 'h ' : ''}${m}m`;
 };
 
+const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+};
+
 // --- COMPOSANTS DE STRUCTURE ---
 
 const DashboardStats = ({ missions }) => {
@@ -131,35 +136,36 @@ const DashboardStats = ({ missions }) => {
     const end = parseFloat(m.kmEnd) || 0;
     return acc + Math.max(0, end - start);
   }, 0);
+  const totalOvernights = missions.filter(m => m.overnight).length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 print:hidden">
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-slate-100 p-3 rounded-2xl text-slate-600"><Plane size={24}/></div>
+        <div className="bg-sky-100 p-3 rounded-2xl text-sky-600"><Plane size={24}/></div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Missions</p>
           <p className="text-2xl font-black text-slate-900">{totalMissions}</p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-sky-100 p-3 rounded-2xl text-sky-600"><Clock size={24}/></div>
+        <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600"><Clock size={24}/></div>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Temps Vol</p>
-          <p className="text-2xl font-black text-sky-600">{(totalMinutes/60).toFixed(1)}h</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Heures Vol</p>
+          <p className="text-2xl font-black text-emerald-600">{(totalMinutes/60).toFixed(1)}h</p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600"><Car size={24}/></div>
+        <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Car size={24}/></div>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Distance</p>
-          <p className="text-2xl font-black text-emerald-600">{totalKm} <span className="text-sm">km</span></p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Véhicule</p>
+          <p className="text-2xl font-black text-orange-600">{totalKm} <span className="text-sm">km</span></p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
-        <div className="bg-slate-900 p-3 rounded-2xl text-white"><CheckCircle2 size={24}/></div>
+        <div className="bg-indigo-100 p-3 rounded-2xl text-indigo-600"><Moon size={24}/></div>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Statut</p>
-          <p className="text-sm font-black text-slate-900">PRÊT</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Découchers</p>
+          <p className="text-2xl font-black text-indigo-600">{totalOvernights}</p>
         </div>
       </div>
     </div>
@@ -175,14 +181,13 @@ const MapView = ({ location }) => {
   if (!location) return (
     <div className="h-48 bg-slate-100 rounded-[32px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 print:hidden">
       <MapIcon size={32} className="mb-2 opacity-20"/>
-      <p className="text-[10px] font-black uppercase tracking-widest">Adresse requise pour la carte</p>
+      <p className="text-[10px] font-black uppercase tracking-widest">Localisation requise</p>
     </div>
   );
 
   return (
     <div className="h-64 rounded-[32px] overflow-hidden border-4 border-white shadow-xl bg-slate-200 relative animate-in fade-in print:h-48 print:shadow-none print:border-slate-200">
       <iframe title="Map" width="100%" height="100%" frameBorder="0" src={mapUrl} allowFullScreen></iframe>
-      <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest print:hidden">Vue Satellite</div>
     </div>
   );
 };
@@ -383,8 +388,8 @@ const AdminScreen = ({ onClose, userUid }) => {
             </div>
             {isCreating ? (
                 <form onSubmit={handleAdd} className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-200 mb-8 grid md:grid-cols-3 gap-6 animate-in slide-in-from-top-4">
-                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
+                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
                     <div className="flex gap-2">
                         <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Valider</button>
                         <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500"><X size={20}/></button>
@@ -450,7 +455,7 @@ export default function App() {
         date: new Date().toISOString().split('T')[0], title: '', client: '', location: '', type: 'Inspection Technique', 
         category: 'Open', scenario: 'A3', checklist: {}, contacts: [], logs: [], documents: [], 
         flightNotes: '', techNotes: '', meteoVent: '', meteoTemp: '', meteoKP: '', 
-        travel: false, kmStart: '', kmEnd: '', createdAt: serverTimestamp()
+        overnight: false, travel: false, kmStart: '', kmEnd: '', createdAt: serverTimestamp()
     };
     const docRef = await addDoc(collection(db, 'users', user.uid, 'missions'), m);
     setCurrentMission({ id: docRef.id, ...m }); setView('edit'); setActiveTab('general');
@@ -476,7 +481,7 @@ export default function App() {
         <div className="flex gap-2">
           {view === 'list' ? (
             <>
-              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 transition-all ${view === 'calendar' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><CalendarIcon size={22}/></button>
+              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 transition-all ${view === 'calendar' ? 'bg-sky-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><CalendarIcon size={22}/></button>
               <button onClick={()=>setIsAdminView(true)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-all"><Shield size={22}/></button>
               <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
             </>
@@ -496,7 +501,7 @@ export default function App() {
             <DashboardStats missions={missions} />
             <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Mes Opérations</h2>
-                <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest">Temps réel actif</div>
+                <div className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase tracking-widest">Suivi d'activité</div>
             </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {missions.map(m => (
@@ -507,9 +512,7 @@ export default function App() {
                     </div>
                     <h3 className="font-black text-2xl text-slate-900 mb-2 uppercase leading-tight group-hover:text-sky-600 transition-colors tracking-tighter">{m.title || m.client || "Nouvelle Mission"}</h3>
                     <p className="text-xs text-slate-500 font-bold flex items-center gap-2 uppercase"><MapPin size={16} className="text-slate-300"/>{m.location || "Non localisée"}</p>
-                    <div className="mt-8 flex flex-wrap gap-2">
-                        <span className="bg-slate-100 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 border border-slate-200">{m.type}</span>
-                    </div>
+                    {m.overnight && <span className="absolute top-10 -right-6 bg-indigo-500 text-white text-[8px] font-black px-8 py-1 rotate-45 uppercase shadow-sm">Découcher</span>}
                 </div>
                 ))}
             </div>
@@ -542,7 +545,7 @@ export default function App() {
 
         {view === 'edit' && currentMission && (
             <div className="bg-white rounded-[56px] shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in print:border-none print:shadow-none print:rounded-none">
-                <div className="flex border-b border-slate-100 bg-slate-50 px-8 gap-8 sticky top-0 z-10 overflow-x-auto print:hidden">
+                <div className="flex border-b border-slate-100 bg-slate-50 px-8 gap-8 sticky top-0 z-10 overflow-x-auto scrollbar-hide print:hidden">
                     {['general', 'technical', 'check', 'flight', 'sign'].map(t => (
                         <button key={t} onClick={() => setActiveTab(t)} className={`py-6 text-[10px] font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === t ? 'text-sky-600' : 'text-slate-400 hover:text-slate-900'}`}>
                             {t === 'general' ? 'Informations' : t === 'technical' ? 'Opérations' : t === 'check' ? 'Sécurité' : t === 'flight' ? 'Logs' : 'Validation'}
@@ -552,22 +555,26 @@ export default function App() {
                 </div>
                 
                 <div className="p-8 md:p-14 print:p-0">
-                    <div className="hidden print:flex justify-between items-center border-b-4 border-slate-900 pb-8 mb-10">
+                    {/* EN-TETE PDF */}
+                    <div className="hidden print:flex justify-between items-start border-b-4 border-slate-900 pb-10 mb-10">
                         <div>
-                            <h1 className="text-4xl font-black uppercase tracking-tighter">Fiche d'intervention</h1>
-                            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm mt-1">Référence : {currentMission.ref}</p>
+                            <h1 className="text-5xl font-black uppercase tracking-tighter leading-none mb-2">Compte-Rendu Mission</h1>
+                            <div className="flex gap-4 text-slate-500 font-black uppercase tracking-widest text-xs">
+                                <span>Réf : {currentMission.ref}</span>
+                                <span>Date : {new Date(currentMission.date).toLocaleDateString()}</span>
+                            </div>
                         </div>
-                        <img src={LOGO_URL} className="h-16 object-contain" alt="Logo Aerothau" />
+                        <img src={LOGO_URL} className="h-20 object-contain" alt="Logo Aerothau" />
                     </div>
 
-                    {activeTab === 'general' && (
-                        <div className="space-y-12 animate-in slide-in-from-bottom-5">
+                    {(activeTab === 'general' || window.matchMedia('print').matches) && (
+                        <div className="space-y-12 animate-in slide-in-from-bottom-5 print:space-y-8">
                             <div className="grid md:grid-cols-2 gap-12 items-start print:grid-cols-2">
-                                <div className="space-y-8">
+                                <div className="space-y-8 print:space-y-6">
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Titre & Client</label>
-                                        <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre de la mission..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Nom du client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Mission & Client</label>
+                                        <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
+                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -582,31 +589,43 @@ export default function App() {
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Lieu</label>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Lieu d'emprise</label>
                                         <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:border-none print:p-0" placeholder="Adresse complète..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
                                     </div>
-                                    <div className="bg-slate-50 p-8 rounded-[40px] border-2 border-slate-100 space-y-6 print:border-slate-300 print:bg-white">
-                                        <div className="flex justify-between items-center">
-                                            <div className="flex items-center gap-3 text-slate-900"><Car size={24}/><h4 className="font-black uppercase text-xs tracking-widest">Déplacement</h4></div>
-                                            <button onClick={()=>handleUpdate('travel', !currentMission.travel)} className={`w-14 h-8 rounded-full transition-all relative ${currentMission.travel ? 'bg-emerald-500' : 'bg-slate-300'} print:hidden`}>
-                                                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${currentMission.travel ? 'left-7' : 'left-1'}`}></div>
-                                            </button>
-                                        </div>
-                                        {currentMission.travel && (
-                                            <div className="grid grid-cols-2 gap-6 animate-in slide-in-from-top-2">
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">KM Départ</label>
-                                                    <input type="number" className="w-full bg-white border-2 border-slate-200 p-3 rounded-xl outline-none font-bold text-slate-800" value={currentMission.kmStart || ''} onChange={e=>handleUpdate('kmStart', e.target.value)} />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">KM Arrivée</label>
-                                                    <input type="number" className="w-full bg-white border-2 border-slate-200 p-3 rounded-xl outline-none font-bold text-slate-800" value={currentMission.kmEnd || ''} onChange={e=>handleUpdate('kmEnd', e.target.value)} />
-                                                </div>
-                                                <div className="col-span-2 text-right">
-                                                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total : {Math.max(0, (currentMission.kmEnd || 0) - (currentMission.kmStart || 0))} km</p>
-                                                </div>
+                                    
+                                    {/* LOGISTIQUE SEPAREE */}
+                                    <div className="grid grid-cols-2 gap-6 print:grid-cols-2">
+                                        <div className={`p-6 rounded-[32px] border-2 transition-all flex flex-col justify-between ${currentMission.overnight ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-300`}>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="text-indigo-600 font-black uppercase text-[10px] tracking-widest">Découcher</div>
+                                                <button onClick={()=>handleUpdate('overnight', !currentMission.overnight)} className={`w-12 h-6 rounded-full transition-all relative print:hidden ${currentMission.overnight ? 'bg-indigo-500' : 'bg-slate-300'}`}>
+                                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${currentMission.overnight ? 'left-6.5' : 'left-0.5'}`}></div>
+                                                </button>
                                             </div>
-                                        )}
+                                            <div className="flex items-center gap-3">
+                                                <Moon className={currentMission.overnight ? 'text-indigo-600' : 'text-slate-300'} size={24}/>
+                                                <span className="font-bold text-slate-700 text-sm">{currentMission.overnight ? 'Grand Déplacement' : 'Base de retour'}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className={`p-6 rounded-[32px] border-2 transition-all flex flex-col justify-between ${currentMission.travel ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-100'} print:bg-white print:border-slate-300`}>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="text-orange-600 font-black uppercase text-[10px] tracking-widest">Kilométrage</div>
+                                                <button onClick={()=>handleUpdate('travel', !currentMission.travel)} className={`w-12 h-6 rounded-full transition-all relative print:hidden ${currentMission.travel ? 'bg-orange-500' : 'bg-slate-300'}`}>
+                                                    <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-all ${currentMission.travel ? 'left-6.5' : 'left-0.5'}`}></div>
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Car className={currentMission.travel ? 'text-orange-600' : 'text-slate-300'} size={24}/>
+                                                {currentMission.travel ? (
+                                                    <div className="flex gap-2 text-xs font-black">
+                                                        <input className="w-12 bg-transparent outline-none border-b border-orange-200 text-center text-slate-900" value={currentMission.kmStart || ''} placeholder="Départ" onChange={e=>handleUpdate('kmStart', e.target.value)} />
+                                                        <span className="text-orange-300">/</span>
+                                                        <input className="w-12 bg-transparent outline-none border-b border-orange-200 text-center text-slate-900" value={currentMission.kmEnd || ''} placeholder="Arrivée" onChange={e=>handleUpdate('kmEnd', e.target.value)} />
+                                                    </div>
+                                                ) : <span className="font-bold text-slate-400 text-sm">Non suivi</span>}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="space-y-8">
@@ -630,61 +649,64 @@ export default function App() {
                         </div>
                     )}
 
-                    {activeTab === 'technical' && (
-                        <div className="space-y-10 animate-in fade-in duration-500 print:mt-10 print:pt-10 print:border-t print:border-slate-200">
+                    {(activeTab === 'technical' || window.matchMedia('print').matches) && (
+                        <div className="space-y-10 animate-in fade-in duration-500 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
                             <div className="grid md:grid-cols-3 gap-6 print:grid-cols-3 print:mb-8">
                                 <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
                                     <Wind className="text-sky-500" size={28}/>
                                     <div className="flex-1">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Vent (km/h)</p>
-                                        <input className="w-full bg-transparent font-black text-lg outline-none" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} />
+                                        <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} />
                                     </div>
                                 </div>
                                 <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
                                     <Thermometer className="text-orange-500" size={28}/>
                                     <div className="flex-1">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Temp. (°C)</p>
-                                        <input className="w-full bg-transparent font-black text-lg outline-none" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} />
+                                        <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} />
                                     </div>
                                 </div>
                                 <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-none print:bg-white print:p-0">
                                     <CloudSun className="text-emerald-500" size={28}/>
                                     <div className="flex-1">
                                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Indice KP</p>
-                                        <input className="w-full bg-transparent font-black text-lg outline-none" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} />
+                                        <input className="w-full bg-transparent font-black text-lg outline-none text-slate-900" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} />
                                     </div>
                                 </div>
                             </div>
                             <div className="grid md:grid-cols-2 gap-12 print:grid-cols-1">
-                                <div className="bg-slate-900 p-10 rounded-[48px] text-white space-y-6 print:bg-white print:text-slate-900 print:p-0 print:border-none">
-                                    <div className="flex items-center gap-4 text-orange-400 mb-6 border-b border-slate-800 pb-6 print:border-slate-900 print:text-slate-900">
-                                        <Plane size={28}/><h4 className="font-black uppercase tracking-widest text-sm">Consignes Vol / ATC</h4>
+                                <div className="bg-slate-900 p-10 rounded-[48px] text-white space-y-8 print:bg-white print:text-slate-900 print:p-0 print:border-none">
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-orange-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-slate-900">
+                                            <Plane size={24}/><h4 className="font-black uppercase tracking-widest text-xs">Consignes Vol / ATC</h4>
+                                        </div>
+                                        <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Détails radio..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea>
                                     </div>
-                                    <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Détails radio, zones P-R-D..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea>
-                                    <div className="flex items-center gap-4 text-emerald-400 mt-10 mb-6 border-b border-slate-800 pb-6 print:border-slate-900 print:text-slate-900 print:mt-6">
-                                        <Wrench size={28}/><h4 className="font-black uppercase tracking-widest text-sm">Notes Techniques</h4>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4 text-emerald-400 mb-2 border-b border-slate-800 pb-4 print:border-slate-900 print:text-slate-900">
+                                            <Wrench size={24}/><h4 className="font-black uppercase tracking-widest text-xs">Notes Techniques</h4>
+                                        </div>
+                                        <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
                                     </div>
-                                    <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Capteurs, précisions..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
                                 </div>
-                                <div className="space-y-6 print:hidden">
-                                    <div className="bg-blue-50 p-8 rounded-[40px] border border-blue-100">
-                                        <h4 className="font-black text-blue-600 text-[10px] uppercase tracking-widest mb-4">Aide mémoire J-0</h4>
-                                        <ul className="space-y-4 text-xs text-blue-900 font-bold">
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500"/> Consultation Geoportail indispensable.</li>
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500"/> Déclaration AlphaTango à jour.</li>
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500"/> Balisage ZET requis.</li>
-                                        </ul>
-                                    </div>
+                                <div className="bg-blue-50 p-10 rounded-[48px] border-2 border-blue-100 print:hidden">
+                                    <h4 className="font-black text-blue-600 text-[10px] uppercase tracking-widest mb-6">Sécurité J-0</h4>
+                                    <ul className="space-y-5 text-xs text-blue-900 font-bold uppercase tracking-tight">
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Consultation Geoportail obligatoire</li>
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Déclaration AlphaTango active</li>
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Balisage ZET requis</li>
+                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Briefing équipe / tiers</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {activeTab === 'check' && (
-                        <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-10">
-                            <div className="bg-slate-900 text-white p-12 rounded-[56px] relative overflow-hidden print:bg-white print:text-slate-900 print:p-0">
+                        <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
+                            <div className="bg-slate-900 text-white p-12 rounded-[56px] relative overflow-hidden print:bg-white print:text-slate-900 print:p-0 print:shadow-none">
                                 <div className="absolute -bottom-10 -right-10 opacity-5 print:hidden"><Shield size={200}/></div>
-                                <div className="flex justify-between items-center border-b border-slate-800 pb-6 mb-8 print:border-slate-900 print:pb-2 print:mb-4">
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-6 mb-8 print:border-slate-900 print:pb-2 print:mb-6">
                                     <div className="text-emerald-400 font-black text-4xl tracking-tighter uppercase print:text-slate-900 print:text-2xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
                                     <select className="bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border border-slate-700 outline-none focus:border-sky-500 print:hidden" value={currentMission.scenario || 'A3'} onChange={e => handleUpdate('scenario', e.target.value)}>
                                         <option value="A1">Open A1</option>
@@ -694,18 +716,18 @@ export default function App() {
                                         <option value="STS-02">STS-02</option>
                                     </select>
                                 </div>
-                                <p className="text-slate-400 text-sm mb-12 leading-relaxed font-medium print:text-slate-500 print:mb-4">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
+                                <p className="text-slate-400 text-sm mb-12 leading-relaxed font-medium print:text-slate-500 print:mb-6">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
                                 <div className="text-sm border-l-4 border-sky-500 pl-6"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 print:text-slate-900">Périmètre ZET</strong><span className="font-bold print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
                             </div>
                             <div className="space-y-6">
-                                <div className="flex justify-between items-end mb-4 px-2 print:mb-2">
+                                <div className="flex justify-between items-center mb-4 px-2 print:mb-4">
                                     <div>
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist Sécurité</h4>
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist de Sécurité</h4>
                                         <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-lg leading-none`}>{safetyScore}%</span>
                                     </div>
                                     <button onClick={() => { const all = {}; activeChecklistItems.forEach(i => all[i.k] = true); handleUpdate('checklist', all); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-500 transition-all active:scale-95 print:hidden">Tout Valider</button>
                                 </div>
-                                <div className="space-y-3 print:space-y-1">
+                                <div className="space-y-3 print:space-y-2">
                                     {activeChecklistItems.map(i => (
                                         <div key={i.k} onClick={() => handleUpdate('checklist', {...(currentMission.checklist||{}), [i.k]: !currentMission.checklist?.[i.k]})} className={`flex items-center gap-5 p-5 rounded-[32px] border-2 cursor-pointer transition-all active:scale-[0.98] ${currentMission.checklist?.[i.k] ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'} print:p-2 print:border-none print:bg-white`}>
                                             <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 transition-all ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 text-transparent'} print:w-4 print:h-4 print:border-slate-900`}>
@@ -720,14 +742,14 @@ export default function App() {
                     )}
 
                     {activeTab === 'flight' && (
-                        <div className="animate-in fade-in duration-500 space-y-10 print:mt-10 print:pt-10 print:border-t print:border-slate-900">
+                        <div className="animate-in fade-in duration-500 space-y-10 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Logbook Opérationnel</h4>
-                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none print:shadow-none">
+                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none">
                                 <table className="w-full text-left">
                                     <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 print:bg-white print:text-slate-900 print:border-slate-900">
-                                        <tr><th className="p-7"># Vol</th><th className="p-7">Horaires</th><th className="p-7">Batterie</th><th className="p-7 text-right">Durée</th></tr>
+                                        <tr><th className="p-7"># Vol</th><th className="p-7">Décollage / Atterrissage</th><th className="p-7">Batterie</th><th className="p-7 text-right">Durée</th></tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-300">
+                                    <tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-200">
                                         {(currentMission.logs || []).map((l, i) => (
                                             <tr key={l.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white">
                                                 <td className="p-7 text-slate-300 font-black print:text-slate-900">{i+1}</td>
@@ -742,23 +764,23 @@ export default function App() {
                                     </tbody>
                                 </table>
                             </div>
-                            <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Vol manuel'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden">+ Saisie manuelle d'un vol</button>
+                            <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Saisie manuelle'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden">+ Saisie manuelle d'un vol</button>
                         </div>
                     )}
 
                     {activeTab === 'sign' && (
-                        <div className="animate-in fade-in duration-500 space-y-12 print:mt-10 print:pt-10 print:border-t print:border-slate-900">
-                            <div className="flex flex-col md:flex-row justify-between items-center bg-slate-900 p-8 md:p-12 rounded-[48px] text-white gap-8 shadow-2xl relative overflow-hidden print:hidden">
-                                <div className="absolute -left-10 -bottom-10 opacity-5"><QrCode size={200}/></div>
+                        <div className="animate-in fade-in duration-500 space-y-12 print:mt-12 print:pt-12 print:border-t-2 print:border-slate-100">
+                            <div className="flex flex-col md:flex-row justify-between items-center bg-slate-900 p-12 rounded-[56px] text-white gap-10 shadow-2xl relative overflow-hidden print:hidden">
+                                <div className="absolute -left-10 -bottom-10 opacity-5"><QrCode size={250}/></div>
                                 <div className="relative z-10 text-center md:text-left">
-                                    <h3 className="font-black text-3xl uppercase tracking-tighter leading-none mb-2">Signature à distance</h3>
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Validation client sécurisée via QR Code.</p>
+                                    <h3 className="font-black text-4xl uppercase tracking-tighter leading-none mb-3">Validation Mobile</h3>
+                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Faites signer votre client sur son propre smartphone.</p>
                                 </div>
-                                <button onClick={() => setQrModal(true)} className="relative z-10 bg-white text-slate-900 px-10 py-4 rounded-[28px] flex items-center gap-3 font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"><QrCode size={24}/> Générer QR Code</button>
+                                <button onClick={() => setQrModal(true)} className="relative z-10 bg-white text-slate-900 px-12 py-5 rounded-[32px] flex items-center gap-4 font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"><QrCode size={24}/> Afficher le QR Code</button>
                             </div>
                             <div className="grid md:grid-cols-2 gap-10 print:grid-cols-2">
                                 <SignaturePad title="Visa Télépilote (Aerothau)" savedData={currentMission.signaturePilote} onSave={d => handleUpdate('signaturePilote', d)} />
-                                <SignaturePad title="Visa Client / Représentant" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
+                                <SignaturePad title="Visa Client / Donneur d'ordre" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
                             </div>
                         </div>
                     )}
@@ -767,13 +789,13 @@ export default function App() {
         )}
 
         {qrModal && (
-            <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300" onClick={()=>setQrModal(false)}>
+            <div className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300" onClick={()=>setQrModal(false)}>
                 <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-950 transition-colors active:scale-90"><X size={36}/></button>
-                    <h3 className="text-3xl font-black mb-2 tracking-tighter uppercase leading-none">Scanner pour valider</h3>
-                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-4">Signature sécurisée pour le client.</p>
-                    <div className="bg-white p-8 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center">
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply" alt="QR Code Signature" />
+                    <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none">Validation Client</h3>
+                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6">Signature sécurisée sans contact.</p>
+                    <div className="bg-white p-10 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center">
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply" alt="QR Code Signature" />
                     </div>
                     <button onClick={()=>setQrModal(false)} className="w-full py-6 bg-slate-950 text-white rounded-[32px] font-black text-lg shadow-xl uppercase tracking-widest active:scale-95 transition-all">Fermer</button>
                 </div>
@@ -800,15 +822,21 @@ const LoginScreen = () => {
 
     return (
         <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
-            <div className="bg-white p-10 md:p-14 rounded-[56px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
-                <img src={LOGO_URL} className="h-20 mx-auto mb-8 object-contain" alt="Logo" onError={(e) => { e.target.style.display='none'; }} />
-                <h2 className="text-3xl font-black mb-1 uppercase tracking-tighter">Pilote Manager</h2>
-                <p className="text-slate-400 text-[10px] font-black uppercase mb-10 tracking-widest">Aerothau Operational Center</p>
-                <form onSubmit={login} className="space-y-5 text-left">
-                    <input required type="email" placeholder="EMAIL" className="w-full bg-slate-50 border-2 p-4 rounded-2xl outline-none font-bold" value={email} onChange={e=>setEmail(e.target.value)} />
-                    <input required type="password" placeholder="MOT DE PASSE" className="w-full bg-slate-50 border-2 p-4 rounded-2xl outline-none font-bold" value={password} onChange={e=>setPassword(e.target.value)} />
-                    {err && <div className="text-red-600 text-xs font-black text-center bg-red-50 p-4 rounded-2xl">{err}</div>}
-                    <button disabled={loading} className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl uppercase tracking-widest text-sm">
+            <div className="bg-white p-12 md:p-16 rounded-[64px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
+                <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" onError={(e) => { e.target.style.display='none'; }} />
+                <h2 className="text-4xl font-black mb-1 uppercase tracking-tighter leading-none">Pilote Manager</h2>
+                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest">Aerothau Operational Center</p>
+                <form onSubmit={login} className="space-y-6 text-left">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                        <input required type="email" placeholder="Saisir email..." className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-[24px] outline-none focus:border-sky-500 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" value={email} onChange={e=>setEmail(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mot de passe</label>
+                        <input required type="password" placeholder="••••••••" className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-[24px] outline-none focus:border-sky-500 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" value={password} onChange={e=>setPassword(e.target.value)} />
+                    </div>
+                    {err && <div className="text-red-600 text-xs font-black text-center bg-red-50 p-4 rounded-[20px] border border-red-100">{err}</div>}
+                    <button disabled={loading} className="w-full bg-slate-900 text-white font-black py-6 rounded-[28px] uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all">
                         {loading ? <Loader2 className="animate-spin mx-auto" /> : "ACCÉDER AU COCKPIT"}
                     </button>
                 </form>
