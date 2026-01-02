@@ -22,8 +22,15 @@ git remote add origin "https://github.com/$githubUser/aerothau-manager.git"
 Write-Host "-> Envoi vers le serveur... (Une fenetre peut s'ouvrir)" -ForegroundColor Yellow
 git push -u origin main --force
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✅ TERMINE ! Votre code est en ligne." -ForegroundColor Green
-    Write-Host "Lien : https://$githubUser.github.io/aerothau-manager/" -ForegroundColor Cyan
+    Write-Host "----------------------------------------------------" -ForegroundColor Green
+    Write-Host "✅ TERMINE ! Votre code est synchronise sur GitHub." -ForegroundColor Green
+    Write-Host ""
+    Write-Host "⚠️ ATTENTION - DERNIERE ETAPE POUR FIXER L'ERREUR 'SETUP PAGES' :" -ForegroundColor Yellow
+    Write-Host "1. Allez sur GitHub.com > Settings > Pages" -ForegroundColor White
+    Write-Host "2. Dans 'Source', choisissez 'GitHub Actions' au lieu de 'Branch'" -ForegroundColor White
+    Write-Host "3. Le déploiement passera alors au VERT." -ForegroundColor White
+    Write-Host ""
+    Write-Host "Lien final : https://$githubUser.github.io/aerothau-manager/" -ForegroundColor Cyan
 } else {
     Write-Host "❌ Erreur de transfert." -ForegroundColor Red
 }
