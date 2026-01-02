@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { 
   Plus, 
+  Printer, 
   Trash2, 
   ChevronLeft, 
   MapPin, 
@@ -51,7 +52,9 @@ import {
   Wrench,
   BatteryCharging,
   ChevronRight,
-  LayoutDashboard
+  Wind,
+  Thermometer,
+  CloudSun
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -135,16 +138,16 @@ const MapView = ({ location }) => {
   }, [location]);
 
   if (!location) return (
-    <div className="h-48 bg-slate-100 rounded-3xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200">
+    <div className="h-48 bg-slate-100 rounded-3xl flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 print:hidden">
       <MapIcon size={32} className="mb-2 opacity-20"/>
-      <p className="text-[10px] font-black uppercase tracking-widest">Saisissez un lieu pour voir la carte</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-center px-4">Localisation requise pour la carte</p>
     </div>
   );
 
   return (
-    <div className="h-64 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-slate-200 relative animate-in fade-in">
+    <div className="h-64 rounded-[32px] overflow-hidden border-4 border-white shadow-xl bg-slate-200 relative animate-in fade-in print:h-48 print:shadow-none print:border-slate-200">
       <iframe title="Map" width="100%" height="100%" frameBorder="0" src={mapUrl} allowFullScreen></iframe>
-      <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest">Vue Satellite</div>
+      <div className="absolute top-4 right-4 bg-slate-900/80 backdrop-blur-md text-white px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest print:hidden">Vue Satellite</div>
     </div>
   );
 };
@@ -153,16 +156,16 @@ const DashboardStats = ({ missions }) => {
   const totalMissions = missions.length;
   const totalMinutes = missions.reduce((acc, m) => acc + (m.logs?.reduce((sum, l) => sum + calculateDuration(l.start, l.end), 0) || 0), 0);
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 print:hidden">
+      <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Missions</p>
         <p className="text-2xl font-black text-slate-900">{totalMissions}</p>
       </div>
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+      <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Vol</p>
         <p className="text-2xl font-black text-sky-600">{(totalMinutes/60).toFixed(1)}h</p>
       </div>
-      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hidden md:block">
+      <div className="bg-white p-5 rounded-[32px] border border-slate-100 shadow-sm hidden md:block">
         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Statut</p>
         <p className="text-sm font-bold text-emerald-500 flex items-center gap-1"><Check size={14}/> Opérationnel</p>
       </div>
@@ -210,14 +213,14 @@ const SignaturePad = ({ title, onSave, savedData }) => {
   };
 
   return (
-    <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
-      <div className="flex justify-between items-center mb-2">
+    <div className="border border-slate-200 rounded-3xl p-5 bg-white shadow-sm print:shadow-none print:border-slate-300">
+      <div className="flex justify-between items-center mb-3">
         <label className="text-[10px] font-black uppercase text-slate-400">{title}</label>
-        <button onClick={() => { canvasRef.current.getContext('2d').clearRect(0,0,600,300); onSave(null); setIsEmpty(true); }} className="text-[10px] text-red-500 font-black">EFFACER</button>
+        <button onClick={() => { canvasRef.current.getContext('2d').clearRect(0,0,600,300); onSave(null); setIsEmpty(true); }} className="text-[10px] text-red-500 font-black print:hidden">EFFACER</button>
       </div>
-      <div className="relative border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 h-32 md:h-40 w-full touch-none overflow-hidden group">
+      <div className="relative border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 h-32 md:h-40 w-full touch-none overflow-hidden group print:bg-white print:border-slate-300">
         {savedData ? <img src={savedData} className="w-full h-full object-contain" alt="sign" /> : (
-          <canvas ref={canvasRef} width={600} height={300} className="w-full h-full cursor-crosshair" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => {setIsDrawing(false); onSave(canvasRef.current.toDataURL());}} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => {setIsDrawing(false); onSave(canvasRef.current.toDataURL());}} />
+          <canvas ref={canvasRef} width={600} height={300} className="w-full h-full cursor-crosshair print:hidden" onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={() => {setIsDrawing(false); onSave(canvasRef.current.toDataURL());}} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={() => {setIsDrawing(false); onSave(canvasRef.current.toDataURL());}} />
         )}
         {isEmpty && !savedData && <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-300 text-[10px] font-black uppercase tracking-widest">Signer ici</div>}
       </div>
@@ -292,7 +295,6 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
                             <div className="bg-blue-600 p-3 rounded-full text-white shadow-lg"><Phone size={20}/></div>
                         </a>
                     ))}
-                    {(!mission.contacts || mission.contacts.length === 0) && <p className="text-slate-600 text-[10px] font-black uppercase text-center py-4">Aucun contact enregistré</p>}
                 </div>
 
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">
@@ -350,7 +352,7 @@ const AdminScreen = ({ onClose, userUid }) => {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-4 md:p-8 bg-slate-50 min-h-screen animate-in fade-in duration-300">
+        <div className="max-w-6xl mx-auto p-4 md:p-8 bg-slate-50 min-h-screen animate-in fade-in duration-300 print:hidden">
             <button onClick={onClose} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 mb-8 font-black text-xs uppercase tracking-widest transition-colors"><ChevronLeft/> Missions</button>
             
             <div className="flex flex-col md:flex-row justify-between gap-6 mb-10 border-b border-slate-200 pb-8">
@@ -425,7 +427,7 @@ const LoginScreen = () => {
     };
 
     return (
-        <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="h-screen bg-slate-950 flex items-center justify-center p-4 print:hidden">
             <div className="bg-white p-10 md:p-14 rounded-[56px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95 duration-300">
                 <img src={LOGO_URL} className="h-20 mx-auto mb-8 object-contain" alt="Logo" onError={(e) => { e.target.style.display='none'; }} />
                 <h2 className="text-4xl font-black mb-1 tracking-tighter uppercase leading-none">Pilote Manager</h2>
@@ -537,7 +539,7 @@ export default function App() {
         ref: `ATH-${new Date().getFullYear()}-${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`,
         date: new Date().toISOString().split('T')[0], title: '', client: '', location: '', type: 'Inspection Technique', 
         category: 'Open', scenario: 'A3', checklist: {}, contacts: [], logs: [], documents: [], 
-        flightNotes: '', techNotes: '', createdAt: serverTimestamp()
+        flightNotes: '', techNotes: '', meteoVent: '', meteoTemp: '', meteoKP: '', createdAt: serverTimestamp()
     };
     const docRef = await addDoc(collection(db, 'users', user.uid, 'missions'), m);
     setCurrentMission({ id: docRef.id, ...m }); setView('edit'); setActiveTab('general');
@@ -554,8 +556,8 @@ export default function App() {
   if (view === 'edit' && isFieldMode && currentMission) return <FieldModeView mission={currentMission} onExit={()=>setIsFieldMode(false)} onUpdate={handleUpdate} />;
 
   return (
-    <div className="min-h-screen font-sans text-slate-800 bg-slate-50 pb-20">
-      <nav className="sticky top-0 z-50 shadow-xl border-b border-slate-700 px-4 md:px-8 py-4 flex justify-between items-center bg-slate-900 text-white">
+    <div className="min-h-screen font-sans text-slate-800 bg-slate-50 pb-20 print:bg-white print:pb-0">
+      <nav className="sticky top-0 z-50 shadow-xl border-b border-slate-700 px-4 md:px-8 py-4 flex justify-between items-center bg-slate-900 text-white print:hidden">
         <div className="flex items-center gap-5">
           {view === 'edit' && <button onClick={() => setView('list')} className="hover:bg-slate-700 p-2 rounded-xl transition-all active:scale-90"><ChevronLeft size={24} /></button>}
           <img src={LOGO_URL} alt="Logo" className="h-10 brightness-0 invert object-contain" onError={(e) => { e.target.style.display='none'; }} /> 
@@ -569,16 +571,19 @@ export default function App() {
               <button onClick={()=>setIsAdminView(true)} className="p-2.5 bg-slate-800 text-white rounded-xl border border-slate-700 hover:bg-slate-700 transition-all"><Shield size={22}/></button>
               <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
             </>
-          ) : (
-            <button onClick={()=>setIsFieldMode(true)} className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Maximize size={20}/> Cockpit</button>
-          )}
-          <button onClick={()=>signOut(auth)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-red-900/40 transition-colors"><LogOut size={22}/></button>
+          ) : view === 'edit' ? (
+            <div className="flex gap-2">
+                <button onClick={() => window.print()} className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 border border-slate-700 shadow-lg transition-all active:scale-95"><Printer size={18}/> Imprimer</button>
+                <button onClick={()=>setIsFieldMode(true)} className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Maximize size={20}/> Cockpit</button>
+            </div>
+          ) : null}
+          <button onClick={()=>signOut(auth)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-red-900/40 transition-colors print:hidden"><LogOut size={22}/></button>
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-8">
+      <main className="max-w-6xl mx-auto p-4 md:p-8 print:p-0 print:max-w-none">
         {view === 'list' && (
-          <div className="animate-in fade-in duration-500">
+          <div className="animate-in fade-in duration-500 print:hidden">
             <DashboardStats missions={missions} />
             <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tighter">Mes Opérations</h2>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -605,8 +610,11 @@ export default function App() {
         )}
 
         {view === 'calendar' && (
-          <div className="bg-white p-10 rounded-[56px] shadow-xl border border-slate-200 animate-in zoom-in-95 duration-300">
-            <h2 className="text-3xl font-black mb-10 uppercase tracking-tighter leading-none">Planning Opérationnel</h2>
+          <div className="bg-white p-10 rounded-[56px] shadow-xl border border-slate-200 animate-in zoom-in-95 duration-300 print:hidden">
+            <div className="flex justify-between items-center mb-10">
+                <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Planning Opérationnel</h2>
+                <button onClick={() => setView('list')} className="text-sky-600 font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-sky-50 px-4 py-2 rounded-xl transition-all"><ChevronLeft size={16}/> Retour Menu</button>
+            </div>
             <div className="space-y-4">
               {missions.length > 0 ? missions.map(m => (
                 <div key={m.id} onClick={() => {setCurrentMission(m); setView('edit');}} className="flex items-center gap-8 p-6 hover:bg-slate-50 rounded-[40px] transition-all cursor-pointer border-2 border-transparent hover:border-slate-100 group">
@@ -626,8 +634,8 @@ export default function App() {
         )}
 
         {view === 'edit' && currentMission && (
-            <div className="bg-white rounded-[56px] shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in duration-300">
-                <div className="flex border-b border-slate-100 bg-slate-50 px-8 gap-8 sticky top-0 z-10 overflow-x-auto scrollbar-hide">
+            <div className="bg-white rounded-[56px] shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in duration-300 print:shadow-none print:border-none print:rounded-none">
+                <div className="flex border-b border-slate-100 bg-slate-50 px-8 gap-8 sticky top-0 z-10 overflow-x-auto scrollbar-hide print:hidden">
                     {['general', 'technical', 'check', 'flight', 'sign'].map(t => (
                         <button key={t} onClick={() => setActiveTab(t)} className={`py-6 text-[10px] font-black uppercase tracking-widest transition-all relative whitespace-nowrap ${activeTab === t ? 'text-sky-600' : 'text-slate-400 hover:text-slate-900'}`}>
                             {t === 'general' ? 'Informations' : t === 'technical' ? 'Opérations' : t === 'check' ? 'Sécurité' : t === 'flight' ? 'Logs' : 'Validation'}
@@ -636,200 +644,154 @@ export default function App() {
                     ))}
                 </div>
                 
-                <div className="p-8 md:p-14">
-                    {activeTab === 'general' && (
+                <div className="p-8 md:p-14 print:p-0">
+                    {/* EN-TETE IMPRESSION */}
+                    <div className="hidden print:flex justify-between items-center border-b-4 border-slate-900 pb-8 mb-10">
+                        <div>
+                            <h1 className="text-4xl font-black uppercase tracking-tighter">Fiche d'intervention</h1>
+                            <p className="text-slate-500 font-bold uppercase tracking-widest text-sm mt-1">Référence : {currentMission.ref}</p>
+                        </div>
+                        <img src={LOGO_URL} className="h-16 object-contain" alt="Logo Aerothau" />
+                    </div>
+
+                    {(activeTab === 'general' || window.matchMedia('print').matches) && (
                         <div className="space-y-12">
-                            <div className="grid md:grid-cols-2 gap-12 items-start">
+                            <div className="grid md:grid-cols-2 gap-12 items-start print:grid-cols-2">
                                 <div className="space-y-8">
                                     <div className="space-y-3">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Titre & Donneur d'ordre</label>
-                                        <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner" placeholder="Titre de la mission..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Titre & Donneur d'ordre</label>
+                                        <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner print:border-none print:p-0 print:bg-white print:shadow-none print:text-2xl" placeholder="Titre de la mission..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
+                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0 print:bg-white print:text-lg" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-4 print:grid-cols-2">
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date d'opération</label>
-                                            <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold" value={currentMission.date || ''} onChange={e => handleUpdate('date', e.target.value)} />
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Date d'opération</label>
+                                            <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold print:border-none print:p-0 print:bg-white" value={currentMission.date || ''} onChange={e => handleUpdate('date', e.target.value)} />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Type de Prestation</label>
-                                            <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold" value={currentMission.type || ''} onChange={e => handleUpdate('type', e.target.value)}>
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Type de Prestation</label>
+                                            <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold print:appearance-none print:border-none print:p-0 print:bg-white" value={currentMission.type || ''} onChange={e => handleUpdate('type', e.target.value)}>
                                                 {MISSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Localisation de l'emprise</label>
-                                        <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold" placeholder="Adresse complète ou GPS..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Catégorie</label>
-                                            <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold" value={currentMission.category || ''} onChange={e => handleUpdate('category', e.target.value)}>
-                                                <option value="Open">OUVERTE (Faible Risque)</option>
-                                                <option value="Specific">SPÉCIFIQUE (Risque Modéré)</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Scénario de vol</label>
-                                            <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold" value={currentMission.scenario || ''} onChange={e => handleUpdate('scenario', e.target.value)}>
-                                                <option value="A1">Open A1</option>
-                                                <option value="A2">Open A2</option>
-                                                <option value="A3">Open A3</option>
-                                                <option value="STS-01">STS-01 (Zone peuplée)</option>
-                                                <option value="STS-02">STS-02 (Hors vue)</option>
-                                            </select>
-                                        </div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Localisation</label>
+                                        <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold print:border-none print:p-0 print:bg-white" placeholder="Adresse complète..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
                                     </div>
                                 </div>
-                                <div className="space-y-10">
-                                  <MapView location={currentMission.location} />
-                                  <div className="space-y-4">
-                                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><LinkIcon size={18} className="text-sky-500"/> Documents & Dossiers Cloud</h4>
-                                      <div className="grid gap-3">
-                                          {(currentMission.documents || []).map((doc, i) => (
-                                              <div key={i} className="flex items-center gap-4 p-5 bg-sky-50/50 rounded-3xl border border-sky-100 relative group transition-all hover:bg-sky-50">
-                                                  <div className="bg-sky-600 p-3 rounded-2xl text-white shadow-lg"><FileText size={18}/></div>
-                                                  <div className="flex-1 overflow-hidden">
-                                                      <input className="bg-transparent font-black text-sky-950 w-full outline-none uppercase text-xs" value={doc.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} />
-                                                      <input className="bg-transparent text-[8px] text-sky-400 w-full outline-none font-bold uppercase tracking-widest" value={doc.url} onChange={e=>{const n=[...currentMission.documents]; n[i].url=e.target.value; handleUpdate('documents',n)}} />
-                                                  </div>
-                                                  <a href={doc.url} target="_blank" rel="noreferrer" className="bg-white p-2.5 rounded-xl text-sky-600 shadow-sm hover:shadow-md transition-all"><ExternalLink size={16}/></a>
-                                                  <button onClick={()=>{const n=[...currentMission.documents]; n.splice(i,1); handleUpdate('documents',n)}} className="bg-red-50 p-2.5 rounded-xl text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:text-red-600"><Trash2 size={16}/></button>
-                                              </div>
-                                          ))}
-                                          <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'Nouveau Document', url:'https://'}])} className="border-2 border-dashed border-slate-200 p-6 rounded-[32px] flex items-center justify-center gap-3 text-slate-400 hover:text-sky-500 hover:border-sky-300 transition-all font-black text-[10px] uppercase tracking-widest">+ Lier un dossier / fichier</button>
-                                      </div>
-                                  </div>
-                                </div>
+                                <MapView location={currentMission.location} />
                             </div>
 
-                            <div className="border-t border-slate-100 pt-12">
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2"><Users size={18} className="text-sky-500"/> Interlocuteurs sur site</h4>
-                                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {(currentMission.contacts || []).map((c, i) => (
-                                        <div key={i} className="flex flex-col gap-2 p-6 bg-slate-50 rounded-3xl border-2 border-slate-100 relative group hover:border-sky-200 transition-all">
-                                            <input className="bg-transparent font-black outline-none text-slate-900 uppercase text-sm" placeholder="Nom du contact" value={c.name} onChange={e => {const n=[...currentMission.contacts]; n[i].name=e.target.value; handleUpdate('contacts',n)}} />
-                                            <div className="flex gap-4">
-                                                <input className="flex-1 bg-transparent text-xs font-bold text-sky-600 outline-none" placeholder="Téléphone" value={c.phone} onChange={e => {const n=[...currentMission.contacts]; n[i].phone=e.target.value; handleUpdate('contacts',n)}} />
-                                                <input className="bg-transparent text-[9px] font-black uppercase text-slate-400 outline-none" placeholder="Rôle" value={c.role} onChange={e => {const n=[...currentMission.contacts]; n[i].role=e.target.value; handleUpdate('contacts',n)}} />
+                            <div className="border-t border-slate-100 pt-10 print:pt-5 print:border-slate-200">
+                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2 print:text-slate-900 print:mb-4"><LinkIcon size={18} className="text-sky-500 print:hidden"/> Documents & Dossiers Cloud</h4>
+                                <div className="grid md:grid-cols-2 gap-4 print:hidden">
+                                    {(currentMission.documents || []).map((doc, i) => (
+                                        <div key={i} className="flex items-center gap-4 p-5 bg-sky-50/50 rounded-3xl border border-sky-100 relative group transition-all hover:bg-sky-50">
+                                            <div className="bg-sky-600 p-3 rounded-2xl text-white shadow-lg"><FileText size={18}/></div>
+                                            <div className="flex-1 overflow-hidden">
+                                                <input className="bg-transparent font-black text-sky-950 w-full outline-none uppercase text-xs" value={doc.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} />
+                                                <input className="bg-transparent text-[8px] text-sky-400 w-full outline-none font-bold uppercase tracking-widest" value={doc.url} onChange={e=>{const n=[...currentMission.documents]; n[i].url=e.target.value; handleUpdate('documents',n)}} />
                                             </div>
-                                            <button onClick={()=>{const n=[...currentMission.contacts]; n.splice(i,1); handleUpdate('contacts',n)}} className="absolute top-4 right-4 text-slate-200 hover:text-red-500 transition-colors"><X size={20}/></button>
+                                            <a href={doc.url} target="_blank" rel="noreferrer" className="bg-white p-2.5 rounded-xl text-sky-600 shadow-sm hover:shadow-md transition-all"><ExternalLink size={16}/></a>
+                                            <button onClick={()=>{const n=[...currentMission.documents]; n.splice(i,1); handleUpdate('documents',n)}} className="bg-red-50 p-2.5 rounded-xl text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:text-red-600"><Trash2 size={16}/></button>
                                         </div>
                                     ))}
-                                    <button onClick={()=>handleUpdate('contacts', [...(currentMission.contacts||[]), {name:'', phone:'', role:''}])} className="border-2 border-dashed border-slate-200 p-8 rounded-[32px] flex items-center justify-center gap-3 text-slate-400 hover:text-sky-500 hover:border-sky-300 transition-all font-black uppercase text-[10px] tracking-widest">+ Ajouter Interlocuteur</button>
+                                    <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'Nouveau Document', url:'https://'}])} className="border-2 border-dashed border-slate-200 p-6 rounded-[32px] flex items-center justify-center gap-3 text-slate-400 hover:text-sky-500 hover:border-sky-300 transition-all font-black text-[10px] uppercase tracking-widest">+ Lier un dossier / fichier</button>
                                 </div>
+                                <div className="hidden print:block text-slate-500 text-[10px] italic">Voir annexes numériques transmises par Aerothau.</div>
                             </div>
                         </div>
                     )}
 
-                    {activeTab === 'technical' && (
-                        <div className="space-y-10 animate-in fade-in duration-500">
-                            <div className="grid md:grid-cols-2 gap-12">
-                                <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl relative overflow-hidden">
-                                    <div className="absolute -top-10 -right-10 opacity-5"><Plane size={240}/></div>
-                                    <div className="flex items-center gap-4 text-orange-400 mb-6 border-b border-slate-800 pb-6"><Plane size={28}/><h4 className="font-black uppercase tracking-widest text-sm">Consignes de Vol / ATC</h4></div>
-                                    <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-3xl outline-none focus:border-orange-500 h-48 text-sm font-medium leading-relaxed" placeholder="Protocoles radio, fréquences, zones P-R-D, hauteurs max, NOTAM spécifiques..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea>
-                                    <div className="flex items-center gap-4 text-emerald-400 mt-10 mb-6 border-b border-slate-800 pb-6"><Wrench size={28}/><h4 className="font-black uppercase tracking-widest text-sm">Objectifs Techniques</h4></div>
-                                    <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-3xl outline-none focus:border-emerald-500 h-48 text-sm font-medium leading-relaxed" placeholder="Format de données, précision RTK, chevauchement, capteurs, angles de vue..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
+                    {(activeTab === 'technical' || window.matchMedia('print').matches) && (
+                        <div className="space-y-10 animate-in fade-in duration-500 print:mt-10 print:pt-10 print:border-t print:border-slate-200">
+                            {/* SECTION METEO */}
+                            <div className="grid md:grid-cols-3 gap-6 print:grid-cols-3 print:mb-8">
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-slate-200 print:bg-white print:p-4">
+                                    <Wind className="text-sky-500" size={28}/>
+                                    <div className="flex-1">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase">Vent (km/h)</p>
+                                        <input className="w-full bg-transparent font-black text-lg outline-none" value={currentMission.meteoVent || ''} onChange={e=>handleUpdate('meteoVent', e.target.value)} />
+                                    </div>
                                 </div>
-                                <div className="space-y-6">
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-slate-200 print:bg-white print:p-4">
+                                    <Thermometer className="text-orange-500" size={28}/>
+                                    <div className="flex-1">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase">Temp. (°C)</p>
+                                        <input className="w-full bg-transparent font-black text-lg outline-none" value={currentMission.meteoTemp || ''} onChange={e=>handleUpdate('meteoTemp', e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4 print:border-slate-200 print:bg-white print:p-4">
+                                    <CloudSun className="text-emerald-500" size={28}/>
+                                    <div className="flex-1">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase">Indice KP</p>
+                                        <input className="w-full bg-transparent font-black text-lg outline-none" value={currentMission.meteoKP || ''} onChange={e=>handleUpdate('meteoKP', e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid md:grid-cols-2 gap-12 print:grid-cols-1 print:gap-8">
+                                <div className="bg-slate-900 p-10 rounded-[48px] text-white shadow-2xl relative overflow-hidden print:bg-white print:text-slate-900 print:p-0 print:shadow-none print:border-none">
+                                    <div className="absolute -top-10 -right-10 opacity-5 print:hidden"><Plane size={240}/></div>
+                                    <div className="flex items-center gap-4 text-orange-400 mb-6 border-b border-slate-800 pb-6 print:text-slate-900 print:border-slate-900 print:pb-2 print:mb-4">
+                                        <Plane size={28} className="print:hidden"/><h4 className="font-black uppercase tracking-widest text-sm">Consignes de Vol / ATC</h4>
+                                    </div>
+                                    <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-3xl outline-none focus:border-orange-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Protocoles radio, fréquences, zones P-R-D..." value={currentMission.flightNotes || ''} onChange={e=>handleUpdate('flightNotes', e.target.value)}></textarea>
+                                    
+                                    <div className="flex items-center gap-4 text-emerald-400 mt-10 mb-6 border-b border-slate-800 pb-6 print:text-slate-900 print:border-slate-900 print:pb-2 print:mb-4 print:mt-6">
+                                        <Wrench size={28} className="print:hidden"/><h4 className="font-black uppercase tracking-widest text-sm">Objectifs Techniques</h4>
+                                    </div>
+                                    <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-5 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Précision RTK, chevauchement, capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
+                                </div>
+                                <div className="space-y-6 print:hidden">
                                     <div className="bg-blue-50 p-8 rounded-[40px] border border-blue-100 shadow-sm">
                                         <div className="flex items-center gap-3 text-blue-600 mb-6"><Info size={24}/> <h4 className="font-black text-[10px] uppercase tracking-widest">Préparation Opérationnelle</h4></div>
                                         <ul className="space-y-4 text-xs text-blue-900 font-bold">
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500 shrink-0"/> Consultation Geoportail / DJI Fly Safe obligatoire.</li>
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500 shrink-0"/> Vérification de l'assurance Responsabilité Civile.</li>
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500 shrink-0"/> Balisage de la Zone d'Exclusion des Tiers (ZET).</li>
-                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500 shrink-0"/> Briefing de sécurité avec les interlocuteurs sur site.</li>
+                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500 shrink-0"/> Consultation Geoportail obligatoire.</li>
+                                            <li className="flex items-start gap-3"><Check size={18} className="text-blue-500 shrink-0"/> Balisage ZET requis.</li>
                                         </ul>
-                                    </div>
-                                    <div className="bg-amber-50 p-8 rounded-[40px] border border-amber-100 shadow-sm">
-                                        <div className="flex items-center gap-3 text-amber-600 mb-6"><AlertCircle size={24}/> <h4 className="font-black text-[10px] uppercase tracking-widest">Plan d'Urgence (ERP)</h4></div>
-                                        <p className="text-xs text-amber-900 font-bold leading-relaxed">
-                                          En cas de perte de contrôle, déclenchez immédiatement le RTH. Si crash, sécurisez la zone et prévenez le siège.
-                                          <br/><br/>
-                                          <strong>Numéro d'urgence : 112</strong>
-                                        </p>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {activeTab === 'check' && (
-                        <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500">
-                            <div className="bg-slate-900 text-white p-12 rounded-[56px] shadow-2xl relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-8 opacity-10"><Shield size={120}/></div>
-                                <div className="text-emerald-400 font-black text-4xl mb-3 tracking-tighter uppercase leading-none">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
-                                <p className="text-slate-400 text-sm mb-12 leading-relaxed font-bold uppercase tracking-wide">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
-                                <div className="space-y-8">
+                    {(activeTab === 'check' || window.matchMedia('print').matches) && (
+                        <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:grid-cols-2 print:mt-10">
+                            <div className="bg-slate-900 text-white p-12 rounded-[56px] shadow-2xl relative overflow-hidden print:bg-white print:text-slate-900 print:shadow-none print:p-0">
+                                <div className="absolute top-0 right-0 p-8 opacity-10 print:hidden"><Shield size={120}/></div>
+                                <div className="text-emerald-400 font-black text-4xl mb-3 tracking-tighter uppercase leading-none print:text-slate-900 print:text-2xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
+                                <p className="text-slate-400 text-sm mb-12 leading-relaxed font-bold uppercase tracking-wide print:text-slate-500 print:mb-4">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
+                                <div className="space-y-8 print:space-y-2">
                                     <div className="flex gap-6 items-start">
-                                        <div className="bg-slate-800 p-4 rounded-3xl text-sky-400 shadow-inner"><Maximize size={24}/></div>
-                                        <div className="text-sm"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 tracking-widest">Périmètre de sécurité (ZET)</strong><span className="font-bold text-slate-200">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
-                                    </div>
-                                    <div className="flex gap-6 items-start">
-                                        <div className="bg-slate-800 p-4 rounded-3xl text-emerald-400 shadow-inner"><BatteryCharging size={24}/></div>
-                                        <div className="text-sm"><strong className="block text-emerald-400 text-[10px] uppercase font-black mb-1 tracking-widest">État du Système</strong><span className="font-bold text-slate-200">Vérifier l'absence d'alertes batterie/moteurs avant décollage.</span></div>
+                                        <div className="bg-slate-800 p-4 rounded-3xl text-sky-400 shadow-inner print:hidden"><Maximize size={24}/></div>
+                                        <div className="text-sm"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 tracking-widest print:text-slate-900">Périmètre ZET</strong><span className="font-bold text-slate-200 print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
                                     </div>
                                 </div>
                             </div>
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-end mb-4 px-2">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Checklist Sécurité</h4>
-                                    <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'}`}>{safetyScore}%</span>
+                            <div className="space-y-6 print:mt-0">
+                                <div className="flex justify-between items-end mb-4 px-2 print:mb-2">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist Sécurité</h4>
+                                    <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-lg`}>{safetyScore}%</span>
                                 </div>
-                                <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden mb-10 p-1 shadow-inner border border-slate-200">
-                                    <div className={`h-full rounded-full transition-all duration-700 ${safetyScore === 100 ? 'bg-emerald-500 shadow-lg shadow-emerald-500/20' : 'bg-orange-500'}`} style={{width: `${safetyScore}%`}}></div>
-                                </div>
-                                <div className="space-y-3">
+                                <div className="space-y-3 print:space-y-1">
                                     {activeChecklistItems.map(i => (
-                                        <label key={i.k} className={`flex items-center gap-5 p-6 rounded-[32px] cursor-pointer transition-all border-2 ${currentMission.checklist?.[i.k] ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
-                                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border-2 transition-all ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 text-transparent'}`}><Check size={24} strokeWidth={4}/></div>
-                                            <input type="checkbox" className="hidden" checked={currentMission.checklist?.[i.k] || false} onChange={() => handleUpdate('checklist', {...(currentMission.checklist||{}), [i.k]: !currentMission.checklist?.[i.k]})} />
-                                            <span className={`font-black uppercase text-xs tracking-tight ${currentMission.checklist?.[i.k] ? 'text-emerald-900' : 'text-slate-600'}`}>{i.l}</span>
-                                        </label>
+                                        <div key={i.k} className="flex items-center gap-5 p-5 rounded-[32px] border-2 bg-slate-50 border-slate-100 print:p-2 print:rounded-none print:border-none print:bg-white">
+                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 text-transparent'} print:w-4 print:h-4 print:border-slate-900`}>
+                                                <Check size={18} strokeWidth={4} className="print:hidden"/>
+                                            </div>
+                                            <span className={`font-black uppercase text-xs tracking-tight ${currentMission.checklist?.[i.k] ? 'text-emerald-900' : 'text-slate-400'} print:text-slate-900 print:text-[10px]`}>{i.l}</span>
+                                        </div>
                                     ))}
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {activeTab === 'flight' && (
-                        <div className="animate-in fade-in duration-500 space-y-10">
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Logbook Opérationnel</h4>
-                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                                        <tr><th className="p-7"># Vol</th><th className="p-7">Décollage</th><th className="p-7">Atterrissage</th><th className="p-7">Batterie</th><th className="p-7 text-right">Durée Effective</th></tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                                        {(currentMission.logs || []).map((l, i) => (
-                                            <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-7 text-slate-300 font-black">{i+1}</td>
-                                                <td className="p-7 font-mono text-slate-500">{l.start}</td>
-                                                <td className="p-7 font-mono text-slate-500">{l.end}</td>
-                                                <td className="p-7 text-sky-600 uppercase text-xs font-black tracking-widest">{l.battery}%</td>
-                                                <td className="p-7 text-right font-black text-slate-900 text-lg tabular-nums">{formatDuration(calculateDuration(l.start, l.end))}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:''}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all">+ Saisie manuelle d'un vol</button>
-                        </div>
-                    )}
-
-                    {activeTab === 'sign' && (
-                        <div className="animate-in fade-in duration-500 space-y-12">
-                            <div className="flex flex-col md:flex-row justify-between items-center bg-slate-900 p-8 md:p-12 rounded-[48px] text-white gap-8 shadow-2xl relative overflow-hidden">
-                                <div className="absolute -left-10 -bottom-10 opacity-5"><QrCode size={200}/></div>
-                                <div className="relative z-10">
-                                    <h3 className="font-black text-3xl uppercase tracking-tighter leading-none mb-2">Signature à distance</h3>
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Le client signe en toute sécurité sur son propre smartphone.</p>
-                                </div>
-                                <button onClick={() => setQrModal(true)} className="relative z-10 bg-white text-slate-900 px-10 py-4 rounded-[28px] flex items-center gap-3 font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all"><QrCode size={24}/> Générer QR Code</button>
-                            </div>
-                            <div className="grid md:grid-cols-2 gap-10">
+                    {(activeTab === 'sign' || window.matchMedia('print').matches) && (
+                        <div className="animate-in fade-in duration-500 space-y-12 print:mt-10 print:pt-10 print:border-t print:border-slate-900">
+                            <div className="grid md:grid-cols-2 gap-10 print:grid-cols-2">
                                 <SignaturePad title="Visa Télépilote (Aerothau)" savedData={currentMission.signaturePilote} onSave={d => handleUpdate('signaturePilote', d)} />
                                 <SignaturePad title="Visa Client / Représentant" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
                             </div>
@@ -844,7 +806,7 @@ export default function App() {
                 <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-950 transition-colors active:scale-90"><X size={36}/></button>
                     <h3 className="text-3xl font-black mb-2 tracking-tighter uppercase leading-none">Scannez pour valider</h3>
-                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-4">Le client doit scanner ce code avec son mobile pour signer l'intervention.</p>
+                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-4">Signature mobile sécurisée pour le client.</p>
                     <div className="bg-white p-8 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply" alt="QR Code Signature" />
                     </div>
