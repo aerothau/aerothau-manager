@@ -1,12 +1,12 @@
 ﻿# Script PowerShell pour automatiser l'envoi sur GitHub (Version aerothau-manager)
 
 Clear-Host
-Write-Host "--- DEBUT DU PROCESSUS D'ENVOI ---" -ForegroundColor Magenta
+Write-Host "--- DÉBUT DU PROCESSUS D'ENVOI ---" -ForegroundColor Magenta
 
 # 0. Vérification du dossier projet
 if (-not (Test-Path "package.json")) {
-    Write-Host "❌ Erreur : Vous n'êtes pas dans la racine du projet (fichier package.json introuvable)." -ForegroundColor Red
-    Write-Host "Utilisez 'cd' pour aller dans votre dossier projet avant de lancer le script."
+    Write-Host "❌ Erreur : Vous n'êtes pas à la racine du projet (package.json non trouvé)." -ForegroundColor Red
+    Write-Host "Tapez 'cd' suivi du chemin de votre dossier projet."
     Read-Host "Appuyez sur Entrée pour quitter..."
     exit
 }
@@ -14,7 +14,7 @@ if (-not (Test-Path "package.json")) {
 # 1. Demander le nom d'utilisateur GitHub
 $githubUser = Read-Host "Entrez votre nom d'utilisateur GitHub"
 if (-not $githubUser) {
-    Write-Host "❌ Erreur : Vous devez entrer un nom d'utilisateur." -ForegroundColor Red
+    Write-Host "❌ Erreur : Nom d'utilisateur vide." -ForegroundColor Red
     Read-Host "Appuyez sur Entrée pour quitter..."
     exit
 }
@@ -36,7 +36,7 @@ git commit -m "Mise à jour Aerothau Manager : Cockpit et Correction UI"
 Write-Host "-> Configuration de la branche 'main'..." -ForegroundColor Cyan
 git branch -M main
 
-Write-Host "-> Mise à jour de l'adresse du serveur (GitHub)..." -ForegroundColor Cyan
+Write-Host "-> Mise à jour du serveur distant (GitHub)..." -ForegroundColor Cyan
 $remoteExists = git remote | Select-String "origin"
 if ($remoteExists) {
     git remote remove origin
@@ -46,13 +46,13 @@ if ($remoteExists) {
 git remote add origin "https://github.com/$githubUser/aerothau-manager.git"
 
 # 4. Envoi sur les serveurs
-Write-Host "-> Envoi forcé vers GitHub... (Une fenêtre d'authentification peut s'ouvrir)" -ForegroundColor Yellow
+Write-Host "-> Transfert vers GitHub... (Une fenêtre de connexion peut s'ouvrir)" -ForegroundColor Yellow
 git push -u origin main --force
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "----------------------------------------------------" -ForegroundColor Red
-    Write-Host "❌ Une erreur est survenue lors du transfert." -ForegroundColor Red
-    Write-Host "Vérifiez que le dépôt 'aerothau-manager' existe bien sur votre compte GitHub." -ForegroundColor Red
+    Write-Host "❌ Erreur de transfert." -ForegroundColor Red
+    Write-Host "Vérifiez que le dépôt 'aerothau-manager' existe sur votre compte GitHub." -ForegroundColor Red
 } else {
     Write-Host "----------------------------------------------------" -ForegroundColor Green
     Write-Host "✅ Succès ! Votre code est synchronisé sur GitHub." -ForegroundColor Green
