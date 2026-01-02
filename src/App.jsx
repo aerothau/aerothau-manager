@@ -57,7 +57,10 @@ import {
   CloudSun,
   Car,
   Moon,
-  CheckCircle2
+  CheckCircle2,
+  FolderOpen,
+  Eye,
+  UserPlus
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -86,6 +89,8 @@ const SCENARIO_INFOS = {
 };
 
 const MISSION_TYPES = ['Inspection Technique', 'Photogrammétrie', 'Audiovisuel', 'Nettoyage (AirFlyClean)', 'Relevé Lidars', 'Thermographie'];
+
+const DOC_TYPES = ['Arrêté Préfectoral', 'Protocole ATC', 'Assurance RC', 'DNC Pilote', 'Plan de prévention', 'Autre'];
 
 const BASE_CHECKLIST = [
   {k:'meteo',l:'Météo / Vent ok'}, {k:'zet',l:'Balisage ZET'}, {k:'auth',l:'Protocoles / Autorisations'}, 
@@ -157,7 +162,7 @@ const DashboardStats = ({ missions }) => {
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
         <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Car size={24}/></div>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Véhicule</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kilomètres</p>
           <p className="text-2xl font-black text-orange-600">{totalKm} <span className="text-sm">km</span></p>
         </div>
       </div>
@@ -271,12 +276,6 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
         return () => clearInterval(timerRef.current);
     }, [isFlying, startTime]);
 
-    const formatTimer = (sec) => {
-        const m = Math.floor(sec / 60).toString().padStart(2, '0');
-        const s = (sec % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
-
     const handleFlight = () => {
         if (!isFlying) {
             setStartTime(Date.now());
@@ -298,7 +297,7 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
     return (
         <div className="fixed inset-0 bg-slate-950 text-white z-[100] flex flex-col p-4 overflow-y-auto animate-in slide-in-from-bottom-10">
             <div className="flex justify-between items-center mb-6">
-                <button onClick={onExit} className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-lg active:scale-90"><ChevronLeft size={24}/></button>
+                <button onClick={onExit} className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-lg active:scale-90 transition-transform"><ChevronLeft size={24}/></button>
                 <div className="text-center">
                     <h2 className="text-emerald-400 font-black tracking-tighter text-xl uppercase">Cockpit Terrain</h2>
                     <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-widest">{mission.ref}</p>
@@ -388,11 +387,11 @@ const AdminScreen = ({ onClose, userUid }) => {
             </div>
             {isCreating ? (
                 <form onSubmit={handleAdd} className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-200 mb-8 grid md:grid-cols-3 gap-6 animate-in slide-in-from-top-4">
-                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
-                    <div className="flex gap-2">
-                        <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Valider</button>
-                        <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500"><X size={20}/></button>
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
+                    <div className="flex gap-2 text-slate-900 font-black">
+                        <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Enregistrer</button>
+                        <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500 hover:bg-red-50 hover:text-red-500 transition-colors"><X size={20}/></button>
                     </div>
                 </form>
             ) : (
@@ -481,7 +480,7 @@ export default function App() {
         <div className="flex gap-2">
           {view === 'list' ? (
             <>
-              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 transition-all ${view === 'calendar' ? 'bg-sky-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><CalendarIcon size={22}/></button>
+              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 transition-all ${view === 'calendar' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><CalendarIcon size={22}/></button>
               <button onClick={()=>setIsAdminView(true)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-all"><Shield size={22}/></button>
               <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
             </>
@@ -555,7 +554,6 @@ export default function App() {
                 </div>
                 
                 <div className="p-8 md:p-14 print:p-0">
-                    {/* EN-TETE PDF */}
                     <div className="hidden print:flex justify-between items-start border-b-4 border-slate-900 pb-10 mb-10">
                         <div>
                             <h1 className="text-5xl font-black uppercase tracking-tighter leading-none mb-2">Compte-Rendu Mission</h1>
@@ -574,7 +572,7 @@ export default function App() {
                                     <div className="space-y-3">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Mission & Client</label>
                                         <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Nom du client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -630,19 +628,68 @@ export default function App() {
                                 </div>
                                 <div className="space-y-8">
                                     <MapView location={currentMission.location} />
-                                    <div className="space-y-4 print:hidden">
-                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2"><LinkIcon size={18} className="text-sky-500"/> Dossiers Cloud</h4>
-                                        {(currentMission.documents || []).map((doc, i) => (
-                                            <div key={i} className="flex items-center gap-4 p-4 bg-sky-50 rounded-2xl border border-sky-100 group transition-all">
-                                                <FileText size={20} className="text-sky-600"/>
-                                                <div className="flex-1 overflow-hidden">
-                                                    <input className="bg-transparent font-black text-sky-900 w-full outline-none uppercase text-[10px]" value={doc.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} />
-                                                </div>
-                                                <a href={doc.url} target="_blank" rel="noreferrer" className="text-sky-400 hover:text-sky-600"><ExternalLink size={18}/></a>
-                                                <button onClick={()=>{const n=[...currentMission.documents]; n.splice(i,1); handleUpdate('documents',n)}} className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={18}/></button>
+                                    {/* SECTION CONTACTS OPTIMISEE */}
+                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300">
+                                        <div className="flex items-center justify-between text-indigo-600 mb-2">
+                                            <div className="flex items-center gap-3">
+                                              <Users size={24}/>
+                                              <h4 className="text-xs font-black uppercase tracking-widest">Interlocuteurs sur site</h4>
                                             </div>
-                                        ))}
-                                        <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'Lien Drive / Document', url:'https://'}])} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black uppercase text-[10px] tracking-widest hover:border-sky-300 hover:text-sky-500 transition-all">+ Ajouter Dossier Opérationnel</button>
+                                            <button onClick={()=>handleUpdate('contacts', [...(currentMission.contacts||[]), {name:'', phone:'', role:''}])} className="bg-indigo-600 text-white p-2 rounded-xl hover:bg-indigo-700 transition-all print:hidden"><UserPlus size={18}/></button>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {(currentMission.contacts || []).map((contact, i) => (
+                                                <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative group animate-in slide-in-from-right-2 print:bg-white print:border-slate-200">
+                                                    <button onClick={()=>{const n=[...currentMission.contacts]; n.splice(i,1); handleUpdate('contacts',n)}} className="absolute top-4 right-4 text-red-300 hover:text-red-500 transition-all print:hidden"><Trash2 size={16}/></button>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[8px] font-black text-slate-400 uppercase">Nom complet</label>
+                                                            <input className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-black text-slate-900 outline-none focus:border-indigo-500" placeholder="Ex: Jean Dupont" value={contact.name} onChange={e=>{const n=[...currentMission.contacts]; n[i].name=e.target.value; handleUpdate('contacts',n)}} />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[8px] font-black text-slate-400 uppercase">Rôle</label>
+                                                            <input className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold text-slate-900 outline-none focus:border-indigo-500" placeholder="Ex: Responsable Sécurité" value={contact.role} onChange={e=>{const n=[...currentMission.contacts]; n[i].role=e.target.value; handleUpdate('contacts',n)}} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                                                        <Phone size={14} className="text-slate-400"/>
+                                                        <input className="flex-1 bg-transparent text-xs font-black text-indigo-600 outline-none" placeholder="Numéro de téléphone..." value={contact.phone} onChange={e=>{const n=[...currentMission.contacts]; n[i].phone=e.target.value; handleUpdate('contacts',n)}} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(currentMission.contacts || []).length === 0 && (
+                                                <p className="text-center text-[10px] text-slate-400 uppercase font-bold py-4">Aucun contact ajouté</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* SECTION DOCUMENTS OPTIMISEE */}
+                                    <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:hidden">
+                                        <div className="flex items-center gap-3 text-sky-600 mb-2">
+                                            <FolderOpen size={24}/>
+                                            <h4 className="text-xs font-black uppercase tracking-widest">Documents Opérationnels</h4>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {(currentMission.documents || []).map((doc, i) => (
+                                                <div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative group animate-in slide-in-from-right-2">
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <select className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-black text-slate-900 outline-none focus:border-sky-500" value={doc.type || ''} onChange={e=>{const n=[...currentMission.documents]; n[i].type=e.target.value; handleUpdate('documents',n)}}>
+                                                            <option value="">-- Type de doc --</option>
+                                                            {DOC_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                                        </select>
+                                                        <input className="bg-white border border-slate-200 rounded-xl p-2 text-[10px] font-bold text-slate-900 outline-none focus:border-sky-500" placeholder="Nom fichier..." value={doc.name} onChange={e=>{const n=[...currentMission.documents]; n[i].name=e.target.value; handleUpdate('documents',n)}} />
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <div className="flex-1 flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                                                            <LinkIcon size={14} className="text-slate-400"/>
+                                                            <input className="flex-1 bg-transparent text-[9px] font-medium text-sky-600 outline-none" placeholder="Lien de visualisation (Drive/Cloud)..." value={doc.url} onChange={e=>{const n=[...currentMission.documents]; n[i].url=e.target.value; handleUpdate('documents',n)}} />
+                                                        </div>
+                                                        <a href={doc.url} target="_blank" rel="noreferrer" className="bg-sky-100 p-2.5 rounded-xl text-sky-600 hover:bg-sky-600 hover:text-white transition-all"><Eye size={18}/></a>
+                                                        <button onClick={()=>{const n=[...currentMission.documents]; n.splice(i,1); handleUpdate('documents',n)}} className="bg-red-50 p-2.5 rounded-xl text-red-400 hover:bg-red-500 hover:text-white transition-all"><Trash2 size={18}/></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'', url:'https://', type:''}])} className="w-full py-5 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 font-black uppercase text-[10px] tracking-widest hover:border-sky-300 hover:text-sky-500 transition-all">+ Ajouter un document</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -689,15 +736,6 @@ export default function App() {
                                         <textarea className="w-full bg-slate-800/50 border-2 border-slate-700 p-6 rounded-3xl outline-none focus:border-emerald-500 h-40 text-sm font-medium leading-relaxed print:bg-white print:border-none print:p-0 print:h-auto" placeholder="Capteurs..." value={currentMission.techNotes || ''} onChange={e=>handleUpdate('techNotes', e.target.value)}></textarea>
                                     </div>
                                 </div>
-                                <div className="bg-blue-50 p-10 rounded-[48px] border-2 border-blue-100 print:hidden">
-                                    <h4 className="font-black text-blue-600 text-[10px] uppercase tracking-widest mb-6">Sécurité J-0</h4>
-                                    <ul className="space-y-5 text-xs text-blue-900 font-bold uppercase tracking-tight">
-                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Consultation Geoportail obligatoire</li>
-                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Déclaration AlphaTango active</li>
-                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Balisage ZET requis</li>
-                                        <li className="flex items-start gap-4"><Check size={20} className="text-blue-500 shrink-0"/> Briefing équipe / tiers</li>
-                                    </ul>
-                                </div>
                             </div>
                         </div>
                     )}
@@ -720,7 +758,7 @@ export default function App() {
                                 <div className="text-sm border-l-4 border-sky-500 pl-6"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 print:text-slate-900">Périmètre ZET</strong><span className="font-bold print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
                             </div>
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center mb-4 px-2 print:mb-4">
+                                <div className="flex justify-between items-end mb-4 px-2 print:mb-4">
                                     <div>
                                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist de Sécurité</h4>
                                         <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-lg leading-none`}>{safetyScore}%</span>
