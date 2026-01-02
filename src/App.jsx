@@ -39,27 +39,27 @@ import {
   Link as LinkIcon,
   Eye,
   Paperclip,
-  Save,
-  Loader2,
-  LogOut,
-  Shield,
-  Maximize,
-  BookOpen,
-  Play,
-  Square,
-  Phone,
-  Mail,
-  BarChart3,
-  WifiOff,
-  ExternalLink,
-  QrCode,
-  AlertOctagon,
-  Car,
-  Check,
-  Clock,
-  BatteryCharging,
-  Wrench,
-  Users
+  Save, 
+  Loader2, 
+  LogOut, 
+  Shield, 
+  Maximize, 
+  BookOpen, 
+  Play, 
+  Square, 
+  Phone, 
+  Mail, 
+  BarChart3, 
+  WifiOff, 
+  ExternalLink, 
+  QrCode, 
+  AlertOctagon, 
+  Car, 
+  Check, 
+  Clock, 
+  BatteryCharging, 
+  Wrench, 
+  Users 
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -76,7 +76,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const LOGO_URL = "/logo.png"; 
+const LOGO_URL = "logo.png"; 
 
 // --- THEME COLORS ---
 const BRAND = {
@@ -156,6 +156,31 @@ const calculateDuration = (start, end) => {
     if (diff < 0) diff += 86400000;
     return diff / 60000;
   } catch(e) { return 0; }
+};
+
+const DashboardStats = ({ missions }) => {
+  const totalMissions = missions.length;
+  const totalMinutes = missions.reduce((acc, m) => {
+    const flightTime = m.logs?.reduce((sum, l) => sum + (calculateDuration(l.start, l.end) || 0), 0) || 0;
+    return acc + flightTime;
+  }, 0);
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Missions</p>
+        <p className="text-2xl font-black text-slate-900">{totalMissions}</p>
+      </div>
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Heures Vol</p>
+        <p className="text-2xl font-black text-sky-600">{(totalMinutes / 60).toFixed(1)}h</p>
+      </div>
+      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hidden md:block">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Statut</p>
+        <p className="text-sm font-bold text-emerald-500 flex items-center gap-1"><Check size={14}/> Opérationnel</p>
+      </div>
+    </div>
+  );
 };
 
 const formatDuration = (minutes) => {
