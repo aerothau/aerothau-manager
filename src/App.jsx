@@ -158,6 +158,12 @@ const calculateDuration = (start, end) => {
   } catch(e) { return 0; }
 };
 
+const formatDuration = (minutes) => {
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  return `${h > 0 ? h + 'h ' : ''}${m}m`;
+};
+
 const DashboardStats = ({ missions }) => {
   const totalMissions = missions.length;
   const totalMinutes = missions.reduce((acc, m) => {
@@ -181,12 +187,6 @@ const DashboardStats = ({ missions }) => {
       </div>
     </div>
   );
-};
-
-const formatDuration = (minutes) => {
-  const h = Math.floor(minutes / 60);
-  const m = Math.round(minutes % 60);
-  return `${h > 0 ? h + 'h ' : ''}${m}m`;
 };
 
 const formatTimer = (sec) => {
@@ -370,16 +370,6 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
                         <div className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-emerald-400' : 'bg-orange-500'}`} style={{width: `${progress}%`}}></div>
                     </div>
                 </div>
-
-                {(mission.flightInstructions || mission.techInstructions) && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 text-sm">
-                        <h3 className="text-xs font-bold text-orange-400 uppercase mb-3">Consignes Terrain</h3>
-                        <div className="space-y-3">
-                            {mission.flightInstructions && <div className="p-3 bg-slate-800 rounded-lg border-l-4 border-orange-500"><strong className="block text-[10px] mb-1">ATC / VOL</strong>{mission.flightInstructions}</div>}
-                            {mission.techInstructions && <div className="p-3 bg-slate-800 rounded-lg border-l-4 border-emerald-500"><strong className="block text-[10px] mb-1">TECHNIQUE</strong>{mission.techInstructions}</div>}
-                        </div>
-                    </div>
-                )}
             </div>
         </div>
     );
@@ -602,7 +592,7 @@ export default function App() {
         ref: `ATH-${new Date().getFullYear()}-${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`,
         date: new Date().toISOString().split('T')[0],
         client: '', location: '', type: 'Inspection Technique', category: 'Open', scenario: 'A3',
-        checklist: {}, contacts: [], logs: [], documents: [], missionInstructions: '', flightInstructions: '', techInstructions: '', travel: false,
+        checklist: {}, contacts: [], logs: [], missionInstructions: '', flightInstructions: '', techInstructions: '', travel: false,
         createdAt: serverTimestamp()
     };
     const docRef = await addDoc(collection(db, 'users', user.uid, 'missions'), m);
@@ -767,6 +757,7 @@ export default function App() {
                                     </tbody>
                                 </table>
                             </div>
+                            <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:''}])} className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold hover:bg-white hover:border-sky-300 hover:text-sky-500 transition-all">+ Saisie manuelle d'un vol</button>
                         </div>
                     )}
 
