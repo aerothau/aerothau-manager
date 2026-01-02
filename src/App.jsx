@@ -82,7 +82,7 @@ const db = getFirestore(app);
 const LOGO_URL = "logo.png"; 
 
 // --- GEMINI API FOR WEATHER ---
-const apiKey = ""; // Runtime provides the key
+const apiKey = ""; // La clé est fournie par l'environnement
 
 const fetchWeatherWithIA = async (location) => {
   if (!location) return null;
@@ -103,8 +103,9 @@ const fetchWeatherWithIA = async (location) => {
       });
       const data = await response.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      const jsonStr = text.replace(/```json|```/g, '').trim();
-      return JSON.parse(jsonStr);
+      // Nettoyage JSON pour être sûr
+      const cleanJson = text.replace(/```json|```/g, '').trim();
+      return JSON.parse(cleanJson);
     } catch (error) {
       if (retries > 0) {
         await new Promise(res => setTimeout(res, delay));
@@ -160,7 +161,57 @@ const formatDuration = (minutes) => {
   return `${h > 0 ? h + 'h ' : ''}${m}m`;
 };
 
-// --- COMPOSANTS ---
+const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+};
+
+// --- COMPOSANTS UI ---
+
+const DashboardStats = ({ missions }) => {
+  const totalMissions = missions.length;
+  const totalMinutes = missions.reduce((acc, m) => acc + (m.logs?.reduce((sum, l) => sum + calculateDuration(l.start, l.end), 0) || 0), 0);
+  const totalKm = missions.reduce((acc, m) => {
+    const start = parseFloat(m.kmStart) || 0;
+    const end = parseFloat(m.kmEnd) || 0;
+    return acc + Math.max(0, end - start);
+  }, 0);
+  const totalOvernights = missions.filter(m => m.overnight).length;
+
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 print:hidden">
+      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-sky-100 p-3 rounded-2xl text-sky-600"><Plane size={24}/></div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Missions</p>
+          <p className="text-2xl font-black text-slate-900 leading-none">{totalMissions}</p>
+        </div>
+      </div>
+      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600"><Clock size={24}/></div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Vol</p>
+          <p className="text-2xl font-black text-emerald-600 leading-none">{(totalMinutes/60).toFixed(1)}h</p>
+        </div>
+      </div>
+      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Car size={24}/></div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Km</p>
+          <p className="text-2xl font-black text-orange-600 leading-none">{totalKm}</p>
+        </div>
+      </div>
+      <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
+        <div className="bg-indigo-100 p-3 rounded-2xl text-indigo-600"><Moon size={24}/></div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Découchers</p>
+          <p className="text-2xl font-black text-indigo-600 leading-none">{totalOvernights}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const MapView = ({ location }) => {
   const mapUrl = useMemo(() => {
@@ -171,7 +222,7 @@ const MapView = ({ location }) => {
   if (!location) return (
     <div className="h-48 bg-slate-100 rounded-[32px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 print:hidden">
       <MapIcon size={32} className="mb-2 opacity-20"/>
-      <p className="text-[10px] font-black uppercase tracking-widest px-6 text-center">Localisation requise pour la carte satellite</p>
+      <p className="text-[10px] font-black uppercase tracking-widest px-6 text-center">Adresse requise pour la carte</p>
     </div>
   );
 
@@ -260,12 +311,6 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
         }
         return () => clearInterval(timerRef.current);
     }, [isFlying, startTime]);
-
-    const formatTimer = (sec) => {
-        const m = Math.floor(sec / 60).toString().padStart(2, '0');
-        const s = (sec % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
 
     const handleFlight = () => {
         if (!isFlying) {
@@ -366,8 +411,8 @@ const AdminScreen = ({ onClose, userUid }) => {
             <button onClick={onClose} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 mb-8 font-black text-xs uppercase tracking-widest transition-colors"><ChevronLeft/> Missions</button>
             <div className="flex flex-col md:flex-row justify-between gap-6 mb-10 border-b border-slate-200 pb-8">
                 <div>
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase">Administration</h1>
-                    <p className="text-slate-500 text-sm font-medium">Configuration globale du cockpit.</p>
+                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Administration</h1>
+                    <p className="text-slate-500 text-sm font-medium mt-1">Gestion globale du cockpit.</p>
                 </div>
                 <div className="flex gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto w-fit h-fit">
                     {['team', 'fleet', 'clients'].map(t => (
@@ -379,15 +424,15 @@ const AdminScreen = ({ onClose, userUid }) => {
             </div>
             {isCreating ? (
                 <form onSubmit={handleAdd} className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-200 mb-8 grid md:grid-cols-3 gap-6 animate-in slide-in-from-top-4">
-                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-black text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-black text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
                     <div className="flex gap-2">
                         <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Valider</button>
                         <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500"><X size={20}/></button>
                     </div>
                 </form>
             ) : (
-                <button onClick={()=>setIsCreating(true)} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest mb-8 hover:bg-white hover:border-sky-300 transition-all">+ Ajouter à la liste {tab}</button>
+                <button onClick={()=>setIsCreating(true)} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest mb-8 hover:bg-white hover:border-sky-300 transition-all">+ Ajouter à {tab}</button>
             )}
             <div className="bg-white rounded-[40px] border border-slate-100 overflow-hidden shadow-sm">
                 <table className="w-full text-left">
@@ -408,7 +453,46 @@ const AdminScreen = ({ onClose, userUid }) => {
     );
 };
 
-// --- MAIN APP COMPONENT ---
+// --- COMPOSANT : LOGIN ---
+const LoginScreen = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [err, setErr] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const login = async (e) => {
+        e.preventDefault(); setLoading(true); setErr('');
+        try { await signInWithEmailAndPassword(auth, email, password); }
+        catch (e) { setErr("Identifiants incorrects."); }
+        finally { setLoading(false); }
+    };
+
+    return (
+        <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="bg-white p-12 md:p-16 rounded-[64px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
+                <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" onError={(e) => { e.target.style.display='none'; }} />
+                <h2 className="text-4xl font-black mb-1 uppercase tracking-tighter leading-none">Pilote Manager</h2>
+                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center">Aerothau Operational Center</p>
+                <form onSubmit={login} className="space-y-6 text-left">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
+                        <input required type="email" placeholder="Saisir email..." className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-[24px] outline-none focus:border-sky-500 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" value={email} onChange={e=>setEmail(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mot de passe</label>
+                        <input required type="password" placeholder="••••••••" className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-[24px] outline-none focus:border-sky-500 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" value={password} onChange={e=>setPassword(e.target.value)} />
+                    </div>
+                    {err && <div className="text-red-600 text-xs font-black text-center bg-red-50 p-4 rounded-[20px] border border-red-100">{err}</div>}
+                    <button disabled={loading} className="w-full bg-slate-900 text-white font-black py-6 rounded-[28px] uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all">
+                        {loading ? <Loader2 className="animate-spin mx-auto" /> : "ACCÉDER AU COCKPIT"}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+// --- APP COMPONENT ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [missions, setMissions] = useState([]);
@@ -491,7 +575,7 @@ export default function App() {
         <div className="flex gap-2">
           {view === 'list' ? (
             <>
-              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 transition-all ${view === 'calendar' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><CalendarIcon size={22}/></button>
+              <button onClick={() => setView('calendar')} className="p-2.5 rounded-xl border border-slate-700 bg-slate-800 text-slate-400 hover:text-white transition-all"><CalendarIcon size={22}/></button>
               <button onClick={()=>setIsAdminView(true)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-all"><Shield size={22}/></button>
               <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
             </>
@@ -519,7 +603,7 @@ export default function App() {
                       <span className="text-[10px] font-black tracking-widest bg-slate-50 text-slate-400 px-4 py-1.5 rounded-full border border-slate-100 uppercase">{m.ref}</span>
                       <span className="text-[9px] font-black uppercase text-sky-600 px-3 py-1 bg-sky-50 rounded-full">{m.scenario}</span>
                     </div>
-                    <h3 className="font-black text-2xl text-slate-900 mb-2 uppercase leading-tight group-hover:text-sky-600 transition-colors tracking-tighter">{m.title || m.client || "Nouvelle Mission"}</h3>
+                    <h3 className="font-black text-2xl text-slate-900 mb-2 uppercase leading-tight group-hover:text-sky-600 transition-colors tracking-tighter leading-none">{m.title || m.client || "Nouvelle Mission"}</h3>
                     <p className="text-xs text-slate-500 font-bold flex items-center gap-2 uppercase tracking-wide"><MapPin size={16} className="text-slate-300"/>{m.location || "Non localisée"}</p>
                     {m.overnight && <span className="absolute top-10 -right-6 bg-indigo-500 text-white text-[8px] font-black px-8 py-1 rotate-45 uppercase shadow-sm">Découcher</span>}
                 </div>
@@ -542,7 +626,7 @@ export default function App() {
                     <span className="text-2xl leading-none">{new Date(m.date).getDate()}</span>
                   </div>
                   <div className="flex-1">
-                    <h4 className="font-black text-xl text-slate-900 uppercase tracking-tighter group-hover:text-sky-600 transition-colors leading-tight">{m.title || m.client || "Mission sans titre"}</h4>
+                    <h4 className="font-black text-xl text-slate-900 uppercase tracking-tighter group-hover:text-sky-600 transition-colors leading-tight leading-none">{m.title || m.client || "Mission sans titre"}</h4>
                     <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 flex items-center gap-1 leading-none"><MapPin size={12}/> {m.location || "Lieu non défini"}</p>
                   </div>
                   <ChevronRight size={28} className="text-slate-200 group-hover:text-sky-400 group-hover:translate-x-2 transition-all"/>
@@ -564,7 +648,6 @@ export default function App() {
                 </div>
                 
                 <div className="p-8 md:p-14 print:p-0">
-                    {/* RAPPORT PDF INTEGRAL */}
                     <div className="hidden print:block">
                         <div className="flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12">
                             <div>
@@ -585,7 +668,7 @@ export default function App() {
                                     <div className="space-y-4">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Mission & Client</label>
                                         <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-slate-900 transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0 print:text-xl" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                        <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Nom du client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -781,7 +864,7 @@ export default function App() {
                                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Vérifications de Sécurité</h4>
                                         <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-xl leading-none`}>{safetyScore}%</span>
                                     </div>
-                                    <button onClick={() => { const all = {}; activeChecklistItems.forEach(i => all[i.k] = true); handleUpdate('checklist', all); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 print:hidden">Tout Valider</button>
+                                    <button onClick={() => { const all = {}; activeChecklistItems.forEach(i => all[i.k] = true); handleUpdate('checklist', all); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-500 transition-all active:scale-95 print:hidden">Tout Valider</button>
                                 </div>
                                 <div className="space-y-3 print:space-y-2">
                                     {activeChecklistItems.map(i => (
@@ -849,42 +932,3 @@ export default function App() {
     </div>
   );
 }
-
-// --- LOGIN SCREEN ---
-const LoginScreen = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [err, setErr] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const login = async (e) => {
-        e.preventDefault(); setLoading(true); setErr('');
-        try { await signInWithEmailAndPassword(auth, email, password); }
-        catch (e) { setErr("Identifiants incorrects."); }
-        finally { setLoading(false); }
-    };
-
-    return (
-        <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
-            <div className="bg-white p-12 md:p-16 rounded-[64px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
-                <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" onError={(e) => { e.target.style.display='none'; }} />
-                <h2 className="text-4xl font-black mb-1 uppercase tracking-tighter leading-none">Pilote Manager</h2>
-                <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center">Aerothau Operational Center</p>
-                <form onSubmit={login} className="space-y-6 text-left">
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email</label>
-                        <input required type="email" placeholder="Saisir email..." className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-[24px] outline-none focus:border-sky-500 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" value={email} onChange={e=>setEmail(e.target.value)} />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Mot de passe</label>
-                        <input required type="password" placeholder="••••••••" className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-[24px] outline-none focus:border-sky-500 focus:bg-white transition-all font-bold text-slate-900 placeholder:text-slate-400" value={password} onChange={e=>setPassword(e.target.value)} />
-                    </div>
-                    {err && <div className="text-red-600 text-xs font-black text-center bg-red-50 p-4 rounded-[20px] border border-red-100">{err}</div>}
-                    <button disabled={loading} className="w-full bg-slate-900 text-white font-black py-6 rounded-[28px] uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all">
-                        {loading ? <Loader2 className="animate-spin mx-auto" /> : "ACCÉDER AU COCKPIT"}
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
-};
