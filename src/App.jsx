@@ -121,7 +121,7 @@ const fetchWeatherWithIA = async (location) => {
   }
 };
 
-// --- 3. CONSTANTES ---
+// --- 3. CONSTANTES MÉTIER ---
 const SCENARIO_INFOS = {
     'A1': { title: "Open A1", description: "Survol de personnes isolées possible (pas de rassemblement).", zet: "ZET: Éviter le survol. Pas de distance minimale." },
     'A2': { title: "Open A2", description: "Vol proximité personnes.", zet: "ZET: 30m des tiers (5m si lent)." },
@@ -162,6 +162,12 @@ const formatDuration = (minutes) => {
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes % 60);
   return `${h > 0 ? h + 'h ' : ''}${m}m`;
+};
+
+const formatTimer = (sec) => {
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = (sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
 };
 
 // --- 5. COMPOSANTS UI ---
@@ -234,7 +240,7 @@ const DashboardStats = ({ missions }) => {
         <div className="bg-orange-100 p-3 rounded-2xl text-orange-600"><Car size={24}/></div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Km</p>
-          <p className="text-2xl font-black text-orange-600 leading-none">{totalKm}</p>
+          <p className="text-2xl font-black text-orange-600">{totalKm}</p>
         </div>
       </div>
       <div className="bg-white p-6 rounded-[32px] border border-slate-100 shadow-sm flex items-center gap-4">
@@ -329,7 +335,7 @@ const SignaturePad = ({ title, onSave, savedData }) => {
   );
 };
 
-// --- COMPOSANT : COCKPIT TERRAIN ---
+// --- COMPOSANT : COCKPIT TERRAIN (AMÉLIORÉ) ---
 const FieldModeView = ({ mission, onExit, onUpdate }) => {
     const [isFlying, setIsFlying] = useState(false);
     const [elapsed, setElapsed] = useState(0);
@@ -346,12 +352,6 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
         }
         return () => clearInterval(timerRef.current);
     }, [isFlying, startTime]);
-
-    const formatTimer = (sec) => {
-        const m = Math.floor(sec / 60).toString().padStart(2, '0');
-        const s = (sec % 60).toString().padStart(2, '0');
-        return `${m}:${s}`;
-    };
 
     const handleFlight = () => {
         if (!isFlying) {
@@ -372,45 +372,115 @@ const FieldModeView = ({ mission, onExit, onUpdate }) => {
     const progress = Math.round((checkedCount / Math.max(activeChecks.length, 1)) * 100);
 
     return (
-        <div className="fixed inset-0 bg-slate-950 text-white z-[100] flex flex-col p-4 overflow-y-auto animate-in slide-in-from-bottom-10">
+        <div className="fixed inset-0 bg-slate-950 text-white z-[100] flex flex-col p-4 overflow-y-auto animate-in slide-in-from-bottom-10 duration-500">
+            {/* Header Cockpit */}
             <div className="flex justify-between items-center mb-6">
-                <button onClick={onExit} className="bg-slate-800 p-3 rounded-xl border border-slate-700 shadow-lg active:scale-90"><ChevronLeft size={24}/></button>
+                <button onClick={onExit} className="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-lg active:scale-90 transition-all"><ChevronLeft size={24}/></button>
                 <div className="text-center">
-                    <h2 className="text-emerald-400 font-black tracking-tighter text-xl uppercase">Cockpit Terrain</h2>
-                    <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase tracking-widest">{mission.ref}</p>
+                    <h2 className="text-emerald-400 font-black tracking-tighter text-xl uppercase leading-none">OPERATIONAL COCKPIT</h2>
+                    <p className="text-[9px] text-slate-500 font-mono mt-1 uppercase tracking-[0.2em]">{mission.ref} | {mission.type}</p>
                 </div>
-                <div className="w-12"></div>
+                <div className="bg-slate-800 p-3 rounded-2xl border border-slate-700 shadow-lg">
+                    <BatteryCharging size={24} className={isFlying ? "text-emerald-400 animate-pulse" : "text-slate-500"} />
+                </div>
             </div>
 
-            <div className="flex-1 space-y-6 pb-20 max-w-lg mx-auto w-full">
-                <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 text-center shadow-2xl">
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Temps de Vol</div>
-                    <div className="text-7xl font-mono font-black mb-10 tabular-nums text-white tracking-tighter">{formatTimer(elapsed)}</div>
-                    <button onClick={handleFlight} className={`w-full py-6 rounded-[28px] font-black text-xl flex items-center justify-center gap-3 transition-all active:scale-95 ${isFlying ? 'bg-red-600 animate-pulse' : 'bg-emerald-600 shadow-emerald-900/40 shadow-xl'}`}>
-                        {isFlying ? <Square fill="currentColor" size={24}/> : <Play fill="currentColor" size={24}/>}
-                        {isFlying ? 'ATTERRIR' : 'DÉCOLLER'}
+            <div className="flex-1 space-y-6 pb-20 max-w-2xl mx-auto w-full">
+                {/* Timer Section */}
+                <div className="bg-slate-900 border border-slate-800 rounded-[48px] p-8 text-center shadow-2xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-emerald-500/20 to-transparent"></div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Chronomètre de Mission</div>
+                    <div className="text-8xl font-mono font-black mb-10 tabular-nums text-white tracking-tighter shadow-emerald-500/20 drop-shadow-2xl">
+                        {formatTimer(elapsed)}
+                    </div>
+                    <button onClick={handleFlight} className={`w-full py-7 rounded-[32px] font-black text-2xl flex items-center justify-center gap-4 transition-all active:scale-95 shadow-2xl ${isFlying ? 'bg-red-600 animate-pulse ring-4 ring-red-600/20' : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/40'}`}>
+                        {isFlying ? <Square fill="currentColor" size={28}/> : <Play fill="currentColor" size={28}/>}
+                        {isFlying ? 'ATTERRISSAGE' : 'DÉCOLLER'}
                     </button>
                 </div>
 
-                <div className="space-y-3">
-                    {(mission.contacts || []).map((c, i) => (
-                        <a key={i} href={`tel:${c.phone}`} className="bg-blue-600/10 border border-blue-500/20 p-5 rounded-3xl flex justify-between items-center active:bg-blue-600/30 transition-all">
+                {/* Environnement & Scenario */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-6 space-y-4">
+                        <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+                            <CloudSun size={20} className="text-sky-400"/>
+                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none">Environnement</h3>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
                             <div>
-                                <div className="font-black text-blue-100 uppercase text-xs tracking-tight">{c.name}</div>
-                                <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">{c.role}</div>
+                                <Wind size={18} className="mx-auto text-slate-500 mb-1"/>
+                                <p className="text-xs font-black">{mission.meteoVent || '--'}</p>
                             </div>
-                            <div className="bg-blue-600 p-3 rounded-full text-white shadow-lg"><Phone size={20}/></div>
-                        </a>
-                    ))}
+                            <div className="border-x border-slate-800">
+                                <Thermometer size={18} className="mx-auto text-slate-500 mb-1"/>
+                                <p className="text-xs font-black">{mission.meteoTemp || '--'}</p>
+                            </div>
+                            <div>
+                                <Shield size={18} className="mx-auto text-slate-500 mb-1"/>
+                                <p className="text-xs font-black">{mission.meteoKP || '--'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-6 space-y-3">
+                         <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+                            <Shield size={20} className="text-emerald-400"/>
+                            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 leading-none">Cadre Règlementaire</h3>
+                        </div>
+                        <div className="bg-slate-800/50 p-3 rounded-2xl border border-slate-700">
+                            <p className="text-xs font-black text-emerald-400 uppercase leading-none mb-1">{SCENARIO_INFOS[mission.scenario]?.title || "Open"}</p>
+                            <p className="text-[9px] text-slate-400 leading-tight font-medium uppercase tracking-tight">{SCENARIO_INFOS[mission.scenario]?.zet}</p>
+                        </div>
+                    </div>
                 </div>
 
+                {/* Consignes & Notes */}
+                <div className="bg-slate-900 border border-slate-800 rounded-[40px] p-8 space-y-6">
+                    <div className="flex items-center gap-3">
+                        <Info size={24} className="text-orange-400"/>
+                        <h3 className="text-xs font-black uppercase tracking-widest text-slate-200">Consignes Opérationnelles</h3>
+                    </div>
+                    
+                    <div className="space-y-4 text-left">
+                        {mission.flightNotes && (
+                            <div className="bg-orange-500/10 border-l-4 border-orange-500 p-4 rounded-r-2xl">
+                                <h4 className="text-[9px] font-black text-orange-400 uppercase mb-1 tracking-widest leading-none">CONSIGNES VOL / ATC</h4>
+                                <p className="text-xs font-medium leading-relaxed text-slate-200">{mission.flightNotes}</p>
+                            </div>
+                        )}
+                        {mission.techNotes && (
+                            <div className="bg-sky-500/10 border-l-4 border-sky-500 p-4 rounded-r-2xl">
+                                <h4 className="text-[9px] font-black text-sky-400 uppercase mb-1 tracking-widest leading-none">CONSIGNES TECHNIQUES</h4>
+                                <p className="text-xs font-medium leading-relaxed text-slate-200">{mission.techNotes}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Sécurité Progress */}
                 <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-6">
-                    <div className="flex justify-between mb-2 text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex justify-between mb-3 text-[10px] font-black uppercase tracking-widest">
                         <span className="text-slate-500">Checklist Sécurité</span>
                         <span className={progress === 100 ? 'text-emerald-400' : 'text-orange-400'}>{progress}%</span>
                     </div>
                     <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden shadow-inner">
-                        <div className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-emerald-500' : 'bg-orange-500'}`} style={{width: `${progress}%`}}></div>
+                        <div className="h-full transition-all duration-700" style={{width: `${progress}%`, backgroundColor: progress === 100 ? '#10b981' : '#f97316'}}></div>
+                    </div>
+                </div>
+
+                {/* Contacts Rapides */}
+                <div className="space-y-3">
+                    <h3 className="text-slate-500 text-[10px] font-black uppercase tracking-widest ml-1 text-left">Contacts d'urgence</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {(mission.contacts || []).map((c, i) => (
+                            <a key={i} href={`tel:${c.phone}`} className="bg-blue-600/10 border border-blue-500/20 p-5 rounded-[28px] flex justify-between items-center active:bg-blue-600/30 transition-all group">
+                                <div className="text-left">
+                                    <div className="font-black text-blue-100 uppercase text-xs leading-none mb-1">{c.name}</div>
+                                    <div className="text-[9px] text-blue-400 font-bold uppercase tracking-widest">{c.role}</div>
+                                </div>
+                                <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg"><Phone size={20}/></div>
+                            </a>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -450,7 +520,7 @@ const AdminScreen = ({ onClose, userUid }) => {
     return (
         <div className="max-w-6xl mx-auto p-4 md:p-8 bg-slate-50 min-h-screen animate-in fade-in">
             <button onClick={onClose} className="flex items-center gap-2 text-slate-500 hover:text-slate-800 mb-8 font-black text-xs uppercase tracking-widest transition-colors"><ChevronLeft/> Missions</button>
-            <div className="flex flex-col md:flex-row justify-between gap-6 mb-10 border-b border-slate-200 pb-8">
+            <div className="flex flex-col md:flex-row justify-between gap-6 mb-10 border-b border-slate-200 pb-8 text-left">
                 <div>
                     <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">Administration</h1>
                     <p className="text-slate-500 text-sm font-medium mt-1">Gestion globale du cockpit.</p>
@@ -464,9 +534,9 @@ const AdminScreen = ({ onClose, userUid }) => {
                 </div>
             </div>
             {isCreating ? (
-                <form onSubmit={handleAdd} className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-200 mb-8 grid md:grid-cols-3 gap-6 animate-in slide-in-from-top-4">
-                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-black placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
-                    <input className="border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-black placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
+                <form onSubmit={handleAdd} className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-200 mb-8 grid md:grid-cols-3 gap-6 animate-in slide-in-from-top-4 text-left">
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-black placeholder:text-slate-400" placeholder="Nom complet" required value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                    <input className="border-2 border-slate-200 p-4 rounded-2xl outline-none focus:border-sky-500 bg-slate-50 focus:bg-white transition-all font-bold text-black placeholder:text-slate-400" placeholder={tab==='team' ? 'Email' : 'Détail (ID/IDN)'} required value={tab==='team'?form.email:form.detail} onChange={e=>tab==='team'?setForm({...form, email:e.target.value}):setForm({...form, detail:e.target.value})} />
                     <div className="flex gap-2">
                         <button className="flex-1 bg-sky-600 hover:bg-sky-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl">Valider</button>
                         <button type="button" onClick={()=>setIsCreating(false)} className="bg-slate-100 p-4 rounded-2xl text-slate-500"><X size={20}/></button>
@@ -494,7 +564,7 @@ const AdminScreen = ({ onClose, userUid }) => {
     );
 };
 
-// --- APPLICATION PRINCIPALE ---
+// --- APP COMPONENT ---
 export default function App() {
   const [user, setUser] = useState(null);
   const [missions, setMissions] = useState([]);
@@ -577,7 +647,7 @@ export default function App() {
         <div className="flex gap-2">
           {view === 'list' ? (
             <>
-              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 transition-all ${view === 'calendar' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><CalendarIcon size={22}/></button>
+              <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl border border-slate-700 ${view === 'calendar' ? 'bg-sky-600 text-white shadow-lg' : 'bg-slate-800 text-slate-400 hover:text-white'} transition-all`}><CalendarIcon size={22}/></button>
               <button onClick={()=>setIsAdminView(true)} className="p-2.5 bg-slate-800 text-slate-400 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-all shadow-md"><Shield size={22}/></button>
               <button onClick={handleCreate} className="bg-sky-600 hover:bg-sky-500 text-white px-6 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-xl active:scale-95 transition-all"><Plus size={20}/> Mission</button>
             </>
@@ -591,7 +661,7 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto p-4 md:p-8 print:p-0 print:max-w-none">
+      <main className="max-w-6xl mx-auto p-4 md:p-8 print:p-0 print:max-w-none text-left">
         {view === 'list' && (
           <div className="animate-in fade-in duration-500">
             <DashboardStats missions={missions} />
@@ -617,14 +687,14 @@ export default function App() {
 
         {view === 'calendar' && (
           <div className="bg-white p-10 rounded-[56px] shadow-xl border border-slate-200 animate-in zoom-in-95 print:hidden">
-            <div className="flex justify-between items-center mb-10">
+            <div className="flex justify-between items-center mb-10 text-left">
                 <h2 className="text-3xl font-black uppercase tracking-tighter leading-none">Planning Opérationnel</h2>
                 <button onClick={() => setView('list')} className="text-sky-600 font-black text-xs uppercase flex items-center gap-2 hover:bg-sky-50 px-4 py-2 rounded-xl transition-all active:scale-95"><ChevronLeft size={16}/> Retour Menu</button>
             </div>
             <div className="space-y-4">
               {missions.length > 0 ? missions.map(m => (
-                <div key={m.id} onClick={() => {setCurrentMission(m); setView('edit');}} className="flex items-center gap-8 p-6 hover:bg-slate-50 rounded-[40px] transition-all cursor-pointer border-2 border-transparent hover:border-slate-100 group">
-                  <div className="bg-sky-100 text-sky-600 w-20 h-20 rounded-[28px] flex flex-col items-center justify-center font-black shadow-inner">
+                <div key={m.id} onClick={() => {setCurrentMission(m); setView('edit');}} className="flex items-center gap-8 p-6 hover:bg-slate-50 rounded-[40px] transition-all cursor-pointer border-2 border-transparent hover:border-slate-100 group text-left">
+                  <div className="bg-sky-100 text-sky-600 w-20 h-20 rounded-[28px] flex flex-col items-center justify-center font-black shadow-inner shrink-0">
                     <span className="text-[10px] uppercase tracking-widest">{new Date(m.date).toLocaleDateString('fr-FR', {month:'short'})}</span>
                     <span className="text-2xl leading-none">{new Date(m.date).getDate()}</span>
                   </div>
@@ -653,7 +723,7 @@ export default function App() {
                 <div className="p-8 md:p-14 print:p-0">
                     {/* EN-TETE PDF */}
                     <div className="hidden print:block">
-                        <div className="flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12">
+                        <div className="flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12 text-left">
                             <div>
                                 <h1 className="text-6xl font-black uppercase tracking-tighter leading-none mb-3">Compte-Rendu Mission</h1>
                                 <div className="flex gap-6 text-slate-500 font-black uppercase tracking-widest text-sm">
@@ -666,29 +736,29 @@ export default function App() {
                     </div>
 
                     {/* SECTION GENERALE */}
-                    <div className={`${activeTab === 'general' ? 'block' : 'hidden print:block'} space-y-12 animate-in slide-in-from-bottom-5 print:space-y-8`}>
+                    <div className={`${activeTab === 'general' ? 'block' : 'hidden print:block'} space-y-12 animate-in slide-in-from-bottom-5 print:space-y-8 text-left`}>
                         <div className="grid md:grid-cols-2 gap-12 items-start print:grid-cols-2">
                             <div className="space-y-8 print:space-y-6">
                                 <div className="space-y-4">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Mission & Client</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900 leading-none">Mission & Client</label>
                                     <input className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white focus:border-sky-500 outline-none font-black text-3xl text-black transition-all shadow-inner print:border-none print:p-0 print:bg-white print:text-2xl" placeholder="Titre..." value={currentMission.title || ''} onChange={e => handleUpdate('title', e.target.value)} />
-                                    <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0 print:text-xl" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
+                                    <input className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 print:border-none print:p-0" placeholder="Client" value={currentMission.client || ''} onChange={e => handleUpdate('client', e.target.value)} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Date</label>
-                                        <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:border-none print:p-0" value={currentMission.date || ''} onChange={e => handleUpdate('date', e.target.value)} />
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900 leading-none">Date</label>
+                                        <input type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black print:border-none print:p-0" value={currentMission.date || ''} onChange={e => handleUpdate('date', e.target.value)} />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Prestation</label>
-                                        <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:appearance-none print:border-none print:p-0" value={currentMission.type || ''} onChange={e => handleUpdate('type', e.target.value)}>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900 leading-none">Prestation</label>
+                                        <select className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black print:appearance-none print:border-none print:p-0" value={currentMission.type || ''} onChange={e => handleUpdate('type', e.target.value)}>
                                             {MISSION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                                         </select>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Lieu d'intervention</label>
-                                    <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold print:border-none print:p-0 print:text-lg" placeholder="Adresse complète..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900 leading-none">Lieu d'intervention</label>
+                                    <input className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black print:border-none print:p-0 print:text-lg" placeholder="Adresse complète..." value={currentMission.location || ''} onChange={e => handleUpdate('location', e.target.value)} />
                                 </div>
                                 
                                 {/* LOGISTIQUE */}
@@ -729,7 +799,7 @@ export default function App() {
                             <div className="space-y-8">
                                 <MapView location={currentMission.location} />
                                 {/* SECTION CONTACTS */}
-                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300 print:shadow-none">
+                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:bg-white print:border-slate-300 print:shadow-none text-left">
                                     <div className="flex items-center justify-between text-indigo-600">
                                         <div className="flex items-center gap-3">
                                           <Users size={24}/>
@@ -754,7 +824,7 @@ export default function App() {
                                     </div>
                                 </div>
                                 {/* SECTION DOCUMENTS */}
-                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:hidden">
+                                <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 print:hidden text-left">
                                     <div className="flex items-center gap-3 text-sky-600 mb-2">
                                         <FolderOpen size={24}/>
                                         <h4 className="text-xs font-black uppercase tracking-widest leading-none">Documents cloud</h4>
@@ -787,7 +857,7 @@ export default function App() {
                     </div>
 
                     {/* SECTION TECHNIQUE / METEO */}
-                    <div className={`${activeTab === 'technical' ? 'block' : 'hidden print:block'} space-y-10 animate-in fade-in duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100`}>
+                    <div className={`${activeTab === 'technical' ? 'block' : 'hidden print:block'} space-y-10 animate-in fade-in duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
                         <div className="flex flex-col md:flex-row gap-6 items-center mb-8 print:hidden">
                             <div className="grid grid-cols-3 gap-6 flex-1 w-full">
                                 <div className="bg-slate-50 border-2 border-slate-100 p-6 rounded-[32px] flex items-center gap-4">
@@ -840,10 +910,10 @@ export default function App() {
                     </div>
 
                     {/* SECTION SECURITE */}
-                    <div className={`${activeTab === 'check' ? 'block' : 'hidden print:block'} grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100`}>
+                    <div className={`${activeTab === 'check' ? 'block' : 'hidden print:block'} grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
                         <div className="bg-slate-900 text-white p-12 rounded-[56px] relative overflow-hidden print:bg-white print:text-black print:p-0 print:shadow-none">
                             <div className="flex justify-between items-center border-b border-slate-800 pb-6 mb-8 print:border-slate-900 print:pb-2 print:mb-6">
-                                <div className="text-emerald-400 font-black text-4xl tracking-tighter uppercase print:text-black print:text-3xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
+                                <div className="text-emerald-400 font-black text-4xl tracking-tighter uppercase print:text-black print:text-3xl leading-none">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
                                 <select className="bg-slate-800 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest border border-slate-700 outline-none print:hidden" value={currentMission.scenario || 'A3'} onChange={e => handleUpdate('scenario', e.target.value)}>
                                     <option value="A1">Open A1</option>
                                     <option value="A2">Open A2</option>
@@ -853,13 +923,13 @@ export default function App() {
                                 </select>
                             </div>
                             <p className="text-slate-400 text-sm mb-12 leading-relaxed font-medium print:text-slate-500 print:mb-6">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
-                            <div className="text-sm border-l-4 border-sky-500 pl-6"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 print:text-black">Cadre ZET</strong><span className="font-bold print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
+                            <div className="text-sm border-l-4 border-sky-500 pl-6"><strong className="block text-sky-400 text-[10px] uppercase font-black mb-1 print:text-black leading-none">Règle ZET</strong><span className="font-bold print:text-slate-700">{SCENARIO_INFOS[currentMission.scenario]?.zet}</span></div>
                         </div>
                         <div className="space-y-6">
                             <div className="flex justify-between items-end mb-4 px-2 print:mb-4">
                                 <div>
                                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-black leading-none mb-2">Checklist Sécurité</h4>
-                                    <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-2xl leading-none`}>{safetyScore}%</span>
+                                    <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-xl leading-none`}>{safetyScore}%</span>
                                 </div>
                                 <button onClick={() => { const all = {}; activeChecklistItems.forEach(i => all[i.k] = true); handleUpdate('checklist', all); }} className="bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-500 transition-all active:scale-95 print:hidden">Tout Valider</button>
                             </div>
@@ -877,18 +947,18 @@ export default function App() {
                     </div>
 
                     {/* SECTION LOGBOOK */}
-                    <div className={`${activeTab === 'flight' ? 'block' : 'hidden print:block'} animate-in fade-in duration-500 space-y-10 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100`}>
+                    <div className={`${activeTab === 'flight' ? 'block' : 'hidden print:block'} animate-in fade-in duration-500 space-y-10 print:mt-16 print:pt-16 print:border-t-2 print:border-slate-100 text-left`}>
                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-black leading-none">Journal des Vols (Logbook)</h4>
-                        <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-400 print:rounded-none print:shadow-none">
+                        <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none print:shadow-none">
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 print:bg-white print:text-black print:border-black">
                                     <tr><th className="p-7">#</th><th className="p-7">Horaires Vol</th><th className="p-7">Batt.</th><th className="p-7 text-right">Durée</th></tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-300 text-black">
+                                <tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-200 text-black leading-none">
                                     {(currentMission.logs || []).map((l, i) => (
                                         <tr key={l.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white">
                                             <td className="p-7 text-slate-300 font-black print:text-black">{i+1}</td>
-                                            <td className="p-7 font-mono text-slate-500 print:text-black text-xs">{l.start || '--:--'} ➔ {l.end || '--:--'}</td>
+                                            <td className="p-7 font-mono text-slate-500 print:text-slate-700 text-xs">{l.start || '--:--'} ➔ {l.end || '--:--'}</td>
                                             <td className="p-7 text-sky-600 font-black print:text-black">{l.battery}%</td>
                                             <td className="p-7 text-right font-black text-black text-lg tabular-nums">{formatDuration(calculateDuration(l.start, l.end))}</td>
                                         </tr>
@@ -899,11 +969,11 @@ export default function App() {
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Vol manuel'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden">+ Saisie manuelle d'un vol</button>
+                        <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:'Saisie manuelle'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden">+ Saisie manuelle d'un vol</button>
                     </div>
 
                     {/* SECTION SIGNATURES */}
-                    <div className={`${activeTab === 'sign' ? 'block' : 'hidden print:block'} animate-in fade-in duration-500 space-y-12 print:mt-16`}>
+                    <div className={`${activeTab === 'sign' ? 'block' : 'hidden print:block'} animate-in fade-in duration-500 space-y-12 print:mt-16 text-left`}>
                         <div className="grid md:grid-cols-2 gap-10 print:grid-cols-2">
                             <SignaturePad title="Visa Télépilote (Aerothau)" savedData={currentMission.signaturePilote} onSave={d => handleUpdate('signaturePilote', d)} />
                             <SignaturePad title="Visa Client / Représentant" savedData={currentMission.signatureClient} onSave={d => handleUpdate('signatureClient', d)} />
@@ -919,8 +989,8 @@ export default function App() {
                 <div className="bg-white p-12 rounded-[64px] max-w-sm w-full text-center shadow-2xl relative animate-in zoom-in-95 duration-300" onClick={e=>e.stopPropagation()}>
                     <button onClick={()=>setQrModal(false)} className="absolute top-8 right-8 text-slate-300 hover:text-slate-950 transition-colors active:scale-90"><X size={36}/></button>
                     <h3 className="text-3xl font-black mb-3 tracking-tighter uppercase leading-none">Validation Mobile</h3>
-                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6 text-center">Scanner pour signer l'intervention.</p>
-                    <div className="bg-white p-10 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center">
+                    <p className="text-[10px] text-slate-400 mb-12 font-black uppercase tracking-widest px-6 text-center leading-tight">Le client doit scanner ce code avec son mobile pour signer l'intervention.</p>
+                    <div className="bg-white p-10 rounded-[48px] shadow-inner mb-12 border border-slate-100 flex items-center justify-center leading-none">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}${window.location.pathname}?mode=sign&uid=${user.uid}&mid=${currentMission.id}`)}`} className="w-full h-auto mix-blend-multiply" alt="QR Code Signature" />
                     </div>
                     <button onClick={()=>setQrModal(false)} className="w-full py-6 bg-slate-950 text-white rounded-[32px] font-black text-lg shadow-xl uppercase tracking-widest active:scale-95 transition-all">Fermer</button>
