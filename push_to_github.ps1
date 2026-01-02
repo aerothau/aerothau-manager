@@ -6,7 +6,7 @@ Write-Host "--- DÉBUT DU PROCESSUS D'ENVOI ---" -ForegroundColor Magenta
 # 0. Vérification du dossier projet
 if (-not (Test-Path "package.json")) {
     Write-Host "❌ Erreur : Vous n'êtes pas à la racine du projet (package.json non trouvé)." -ForegroundColor Red
-    Write-Host "Tapez 'cd' suivi du chemin de votre dossier projet."
+    Write-Host "Tapez 'cd' suivi du chemin de votre dossier projet." 
     Read-Host "Appuyez sur Entrée pour quitter..."
     exit
 }
