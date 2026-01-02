@@ -54,7 +54,8 @@ import {
   ChevronRight,
   Wind,
   Thermometer,
-  CloudSun
+  CloudSun,
+  CheckCircle2
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -600,11 +601,6 @@ export default function App() {
                     </div>
                 </div>
                 ))}
-                {missions.length === 0 && (
-                  <div className="col-span-full py-32 text-center text-slate-300 font-black uppercase tracking-widest bg-white rounded-[56px] border-4 border-dashed border-slate-100 animate-pulse">
-                    En attente de votre première mission
-                  </div>
-                )}
             </div>
           </div>
         )}
@@ -699,7 +695,6 @@ export default function App() {
                                     ))}
                                     <button onClick={()=>handleUpdate('documents', [...(currentMission.documents||[]), {name:'Nouveau Document', url:'https://'}])} className="border-2 border-dashed border-slate-200 p-6 rounded-[32px] flex items-center justify-center gap-3 text-slate-400 hover:text-sky-500 hover:border-sky-300 transition-all font-black text-[10px] uppercase tracking-widest">+ Lier un dossier / fichier</button>
                                 </div>
-                                <div className="hidden print:block text-slate-500 text-[10px] italic">Voir annexes numériques transmises par Aerothau.</div>
                             </div>
                         </div>
                     )}
@@ -761,7 +756,16 @@ export default function App() {
                         <div className="grid md:grid-cols-2 gap-12 animate-in slide-in-from-right-10 duration-500 print:grid-cols-2 print:mt-10">
                             <div className="bg-slate-900 text-white p-12 rounded-[56px] shadow-2xl relative overflow-hidden print:bg-white print:text-slate-900 print:shadow-none print:p-0">
                                 <div className="absolute top-0 right-0 p-8 opacity-10 print:hidden"><Shield size={120}/></div>
-                                <div className="text-emerald-400 font-black text-4xl mb-3 tracking-tighter uppercase leading-none print:text-slate-900 print:text-2xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
+                                <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6 print:border-slate-200">
+                                    <div className="text-emerald-400 font-black text-3xl tracking-tighter uppercase print:text-slate-900 print:text-2xl">{SCENARIO_INFOS[currentMission.scenario]?.title}</div>
+                                    <select className="bg-slate-800 text-white px-3 py-1.5 rounded-xl font-black text-[10px] uppercase tracking-widest border border-slate-700 outline-none focus:border-sky-500 print:hidden" value={currentMission.scenario || 'A3'} onChange={e => handleUpdate('scenario', e.target.value)}>
+                                        <option value="A1">Open A1</option>
+                                        <option value="A2">Open A2</option>
+                                        <option value="A3">Open A3</option>
+                                        <option value="STS-01">STS-01</option>
+                                        <option value="STS-02">STS-02</option>
+                                    </select>
+                                </div>
                                 <p className="text-slate-400 text-sm mb-12 leading-relaxed font-bold uppercase tracking-wide print:text-slate-500 print:mb-4">{SCENARIO_INFOS[currentMission.scenario]?.description}</p>
                                 <div className="space-y-8 print:space-y-2">
                                     <div className="flex gap-6 items-start">
@@ -771,14 +775,30 @@ export default function App() {
                                 </div>
                             </div>
                             <div className="space-y-6 print:mt-0">
-                                <div className="flex justify-between items-end mb-4 px-2 print:mb-2">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist Sécurité</h4>
-                                    <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-lg`}>{safetyScore}%</span>
+                                <div className="flex justify-between items-center mb-4 px-2 print:mb-2">
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest print:text-slate-900">Checklist Sécurité</h4>
+                                        <span className={`text-3xl font-black ${safetyScore === 100 ? 'text-emerald-500' : 'text-orange-500'} print:text-lg leading-none`}>{safetyScore}%</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            const allChecked = {};
+                                            activeChecklistItems.forEach(i => allChecked[i.k] = true);
+                                            handleUpdate('checklist', allChecked);
+                                        }}
+                                        className="bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-emerald-500 transition-all active:scale-95 print:hidden"
+                                    >
+                                        Tout valider
+                                    </button>
                                 </div>
                                 <div className="space-y-3 print:space-y-1">
                                     {activeChecklistItems.map(i => (
-                                        <div key={i.k} className="flex items-center gap-5 p-5 rounded-[32px] border-2 bg-slate-50 border-slate-100 print:p-2 print:rounded-none print:border-none print:bg-white">
-                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-200 text-transparent'} print:w-4 print:h-4 print:border-slate-900`}>
+                                        <div 
+                                            key={i.k} 
+                                            onClick={() => handleUpdate('checklist', {...(currentMission.checklist||{}), [i.k]: !currentMission.checklist?.[i.k]})}
+                                            className={`flex items-center gap-5 p-5 rounded-[32px] border-2 cursor-pointer transition-all active:scale-[0.98] ${currentMission.checklist?.[i.k] ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-100 hover:border-slate-200'} print:p-2 print:rounded-none print:border-none print:bg-white print:active:scale-100`}
+                                        >
+                                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border-2 transition-all ${currentMission.checklist?.[i.k] ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 text-transparent'} print:w-4 print:h-4 print:border-slate-900`}>
                                                 <Check size={18} strokeWidth={4} className="print:hidden"/>
                                             </div>
                                             <span className={`font-black uppercase text-xs tracking-tight ${currentMission.checklist?.[i.k] ? 'text-emerald-900' : 'text-slate-400'} print:text-slate-900 print:text-[10px]`}>{i.l}</span>
@@ -786,6 +806,34 @@ export default function App() {
                                     ))}
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {(activeTab === 'flight' || window.matchMedia('print').matches) && (
+                        <div className="animate-in fade-in duration-500 space-y-10 print:mt-10 print:pt-10 print:border-t print:border-slate-900">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900">Logbook Opérationnel</h4>
+                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm print:border-slate-300 print:rounded-none print:shadow-none">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-widest border-b border-slate-100 print:bg-white print:text-slate-900 print:border-slate-900">
+                                        <tr><th className="p-7"># Vol</th><th className="p-7">Décollage</th><th className="p-7">Atterrissage</th><th className="p-7">Batterie</th><th className="p-7 text-right">Durée</th></tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 font-bold text-slate-700 print:divide-slate-300">
+                                        {(currentMission.logs || []).map((l, i) => (
+                                            <tr key={l.id} className="hover:bg-slate-50 transition-colors print:hover:bg-white">
+                                                <td className="p-7 text-slate-300 font-black print:text-slate-900">{i+1}</td>
+                                                <td className="p-7 font-mono text-slate-500 print:text-slate-700">{l.start || '--:--'}</td>
+                                                <td className="p-7 font-mono text-slate-500 print:text-slate-700">{l.end || '--:--'}</td>
+                                                <td className="p-7 text-sky-600 uppercase text-xs font-black tracking-widest print:text-slate-900">{l.battery}%</td>
+                                                <td className="p-7 text-right font-black text-slate-900 text-lg tabular-nums">{formatDuration(calculateDuration(l.start, l.end))}</td>
+                                            </tr>
+                                        ))}
+                                        {(currentMission.logs || []).length === 0 && (
+                                            <tr><td colSpan="5" className="p-20 text-center text-slate-300 font-black uppercase text-xs tracking-widest print:text-slate-900">Aucun vol enregistré</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40', notes:''}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs tracking-widest hover:bg-white hover:border-sky-300 hover:text-sky-600 transition-all active:scale-[0.99] print:hidden">+ Saisie manuelle d'un vol</button>
                         </div>
                     )}
 
