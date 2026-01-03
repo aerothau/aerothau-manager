@@ -56,7 +56,10 @@ import {
   MessageSquare,
   Navigation,
   Lock,
-  Unlock
+  Unlock,
+  AlertTriangle,
+  User,
+  Cpu
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION FIREBASE ---
@@ -73,14 +76,20 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-const LOGO_URL = "logo.png"; 
+// --- COMPOSANT LOGO DYNAMIQUE ---
+const Logo = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" fill="none" className={className}>
+    <path d="M20 55 L40 15 L60 55 M30 45 L50 45" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
+    <text x="75" y="50" fontFamily="Arial" fontSize="38" fontWeight="900" fill="currentColor" letterSpacing="-1">AEROTHAU</text>
+  </svg>
+);
 
 // --- 2. IA WEATHER INTEGRATION ---
 const apiKey = ""; 
 
 const fetchWeatherWithIA = async (location) => {
   if (!location) return null;
-  const systemPrompt = "Expert météo drone. Récupère temp (°C), vent (km/h), KP. Réponds UNIQUEMENT en JSON : {\"temp\": \"valeur\", \"wind\": \"valeur\", \"kp\": \"valeur\", \"desc\": \"météo\"}.";
+  const systemPrompt = "Expert météo aéronautique. Récupère temp (°C), vent (km/h), KP. Réponds UNIQUEMENT en JSON : {\"temp\": \"valeur\", \"wind\": \"valeur\", \"kp\": \"valeur\", \"desc\": \"météo\"}.";
   const userQuery = `Météo pour : ${location}`;
 
   try {
@@ -96,7 +105,9 @@ const fetchWeatherWithIA = async (location) => {
     });
     const data = await response.json();
     return JSON.parse(data.candidates[0].content.parts[0].text);
-  } catch (err) { return null; }
+  } catch (err) { 
+    return null; 
+  }
 };
 
 // --- 3. CONSTANTES MÉTIER ---
@@ -167,17 +178,19 @@ const LoginScreen = () => {
     return (
         <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
             <div className="bg-white p-12 rounded-[48px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
-                <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" />
+                <div className="h-24 flex items-center justify-center mb-6 text-slate-900">
+                    <Logo className="h-full w-auto" />
+                </div>
                 <h2 className="text-3xl font-black mb-1 uppercase text-slate-900 tracking-tighter">Pilote Manager</h2>
                 <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center">Aerothau Operational Center</p>
                 <form onSubmit={login} className="space-y-6 text-left">
                     <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Email</label>
-                        <input required type="email" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 font-bold text-black" value={email} onChange={e=>setEmail(e.target.value)} />
+                        <input required type="email" placeholder="Email" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 font-bold text-black" value={email} onChange={e=>setEmail(e.target.value)} />
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Mot de passe</label>
-                        <input required type="password" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 font-bold text-black" value={password} onChange={e=>setPassword(e.target.value)} />
+                        <input required type="password" placeholder="••••••••" className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl outline-none focus:border-sky-500 font-bold text-black" value={password} onChange={e=>setPassword(e.target.value)} />
                     </div>
                     {err && <div className="text-red-600 text-xs font-bold text-center bg-red-50 p-3 rounded-xl">{err}</div>}
                     <button disabled={loading} className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-sm shadow-xl active:scale-95 transition-all">
@@ -502,6 +515,9 @@ export default function App() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [isFieldMode, setIsFieldMode] = useState(false);
   const [qrModal, setQrModal] = useState(false);
+  const [pilotsList, setPilotsList] = useState([]);
+  const [dronesList, setDronesList] = useState([]);
+  const [clientsList, setClientsList] = useState([]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, u => { setUser(u); setLoading(false); });
@@ -513,7 +529,10 @@ export default function App() {
     const unsub = onSnapshot(query(collection(db, 'users', user.uid, 'missions')), s => {
         setMissions(s.docs.map(d => ({id: d.id, ...d.data()})));
     });
-    return () => unsub();
+    const unsubPilots = onSnapshot(query(collection(db, 'employees')), s => setPilotsList(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubDrones = onSnapshot(query(collection(db, 'users', user.uid, 'fleet')), s => setDronesList(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    const unsubClients = onSnapshot(query(collection(db, 'users', user.uid, 'clients')), s => setClientsList(s.docs.map(d => ({id: d.id, ...d.data()}))));
+    return () => { unsub(); unsubPilots(); unsubDrones(); unsubClients(); };
   }, [user]);
 
   const handleUpdate = async (f, v) => {
@@ -537,7 +556,8 @@ export default function App() {
         ref: `ATH-${new Date().getFullYear()}-${Math.floor(Math.random()*10000).toString().padStart(4,'0')}`,
         date: new Date().toISOString().split('T')[0], title: '', client: '', location: '', type: 'Inspection Technique', 
         category: 'Open', scenario: 'A3', status: 'En cours', debriefing: '', checklist: {}, contacts: [], logs: [], documents: [], 
-        takeOffPoints: [], flightNotes: '', techNotes: '', meteoVent: '', meteoTemp: '', meteoKP: '', overnight: false, travel: false, createdAt: serverTimestamp()
+        takeOffPoints: [], flightNotes: '', techNotes: '', meteoVent: '', meteoTemp: '', meteoKP: '', overnight: false, travel: false, 
+        pilot: '', drone: '', createdAt: serverTimestamp()
     };
     const docRef = await addDoc(collection(db, 'users', user.uid, 'missions'), m);
     setCurrentMission({ id: docRef.id, ...m }); setView('edit'); setActiveTab('general'); setIsLocked(false);
@@ -563,10 +583,9 @@ export default function App() {
   return (
     <div className="min-h-screen font-sans bg-slate-50 pb-20 text-left text-black leading-none">
       <nav className="sticky top-0 z-50 shadow-xl border-b border-slate-700 px-4 md:px-8 py-4 flex justify-between items-center bg-slate-900 text-white print:hidden leading-none text-left">
-        <div className="flex items-center gap-5 leading-none">
+        <div className="flex items-center gap-5 leading-none text-white">
           {view !== 'list' && <button onClick={() => setView('list')} className="hover:bg-slate-700 p-2 rounded-xl transition-all leading-none text-white"><ChevronLeft size={24}/></button>}
-          <img src={LOGO_URL} className="h-10 brightness-0 invert object-contain" onError={(e)=>e.target.style.display='none'} /> 
-          <span className="font-black text-2xl tracking-tighter uppercase leading-none text-white">Aerothau</span>
+          <div className="h-8 flex items-center"><Logo className="h-full w-auto text-white"/></div>
         </div>
         <div className="flex gap-2 text-black leading-none">
           {view === 'list' ? (
@@ -619,29 +638,43 @@ export default function App() {
                     ))}
                 </div>
                 
-                <div className="p-8 md:p-14 print:p-0 leading-none text-black text-left">
-                    {/* EN-TETE PRINT */}
+                <div className="p-8 md:p-14 print:p-0 leading-none text-black text-left text-black text-left">
                     <div className="hidden print:flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12 text-black leading-none text-black text-left">
                         <div><h1 className="text-6xl font-black uppercase tracking-tighter text-black leading-none mb-3 text-black text-left">Compte-Rendu Mission</h1><div className="flex gap-6 text-slate-500 font-black uppercase tracking-widest text-sm leading-none text-black text-left"><span>Référence : {currentMission.ref}</span><span>Date : {new Date(currentMission.date).toLocaleDateString()}</span></div></div>
-                        <img src={LOGO_URL} className="h-24 object-contain leading-none text-black text-left" alt="Aerothau" />
+                        <div className="h-24"><Logo className="h-full w-auto text-black"/></div>
                     </div>
 
                     {activeTab === 'general' && (
                         <div className="space-y-12 animate-in slide-in-from-bottom-5 print:space-y-8 text-left leading-none text-black text-left">
                             <div className="grid md:grid-cols-2 gap-12 items-start print:grid-cols-2 leading-none text-black text-left">
-                                <div className="space-y-8 print:space-y-6 leading-none text-black text-left">
-                                    <div className="space-y-4 leading-none text-black text-left">
+                                <div className="space-y-8 print:space-y-6 leading-none text-black text-left text-black">
+                                    <div className="space-y-4 leading-none text-black text-left text-black text-left">
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 print:text-slate-900 leading-none text-black text-left">Mission & Client</label>
                                         <input disabled={isLocked} className="w-full border-2 border-slate-100 p-6 rounded-[32px] bg-slate-50 focus:bg-white outline-none font-black text-3xl text-black leading-none text-black text-left" value={currentMission.title || ''} onChange={e=>handleUpdate('title', e.target.value)} />
-                                        <input disabled={isLocked} className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 leading-none text-black text-left" placeholder="Client" value={currentMission.client || ''} onChange={e=>handleUpdate('client', e.target.value)} />
+                                        <select disabled={isLocked} className="w-full border-2 border-slate-100 p-5 rounded-2xl bg-slate-50 focus:bg-white outline-none font-bold text-slate-700 leading-none text-black text-left" value={currentMission.client || ''} onChange={e=>handleUpdate('client', e.target.value)}>
+                                            <option value="">Sélectionner un Client</option>
+                                            {clientsList.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                        </select>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 text-black text-left">
                                         <div className="space-y-2 text-black leading-none text-left"><label className="text-[10px] font-black text-slate-400 uppercase ml-1 print:text-slate-900 leading-none text-black text-left">Date</label><input disabled={isLocked} type="date" className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black leading-none text-black text-left" value={currentMission.date || ''} onChange={e=>handleUpdate('date', e.target.value)} /></div>
                                         <div className="space-y-2 text-black leading-none text-left"><label className="text-[10px] font-black text-slate-400 uppercase ml-1 print:text-slate-900 leading-none text-black text-left">Prestation</label><select disabled={isLocked} className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black leading-none text-black text-left" value={currentMission.type || ''} onChange={e=>handleUpdate('type', e.target.value)}>{MISSION_TYPES.map(t=><option key={t} value={t}>{t}</option>)}</select></div>
                                     </div>
-                                    <div className="space-y-2 text-black leading-none text-left"><label className="text-[10px] font-black text-slate-400 uppercase ml-1 print:text-slate-900 leading-none text-black text-left">Lieu</label><input disabled={isLocked} className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black print:border-none print:p-0 print:text-lg leading-none text-black text-left" value={currentMission.location || ''} onChange={e=>handleUpdate('location', e.target.value)} /></div>
+                                    <div className="grid grid-cols-2 gap-4 text-black text-left">
+                                        <div className="space-y-2 text-black leading-none text-left"><label className="text-[10px] font-black text-slate-400 uppercase ml-1 print:text-slate-900 leading-none text-black text-left">Pilote</label>
+                                        <select disabled={isLocked} className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black leading-none text-black text-left" value={currentMission.pilot || ''} onChange={e=>handleUpdate('pilot', e.target.value)}>
+                                            <option value="">Sélectionner</option>
+                                            {pilotsList.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                        </select></div>
+                                        <div className="space-y-2 text-black leading-none text-left"><label className="text-[10px] font-black text-slate-400 uppercase ml-1 print:text-slate-900 leading-none text-black text-left">Drone</label>
+                                        <select disabled={isLocked} className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black leading-none text-black text-left" value={currentMission.drone || ''} onChange={e=>handleUpdate('drone', e.target.value)}>
+                                            <option value="">Sélectionner</option>
+                                            {dronesList.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                        </select></div>
+                                    </div>
+                                    <div className="space-y-2 text-black leading-none text-left"><label className="text-[10px] font-black text-slate-400 uppercase ml-1 print:text-slate-900 leading-none text-black">Lieu</label><input disabled={isLocked} className="w-full border-2 border-slate-100 p-4 rounded-2xl bg-slate-50 outline-none font-bold text-black print:border-none print:p-0 print:text-lg leading-none text-black text-left" value={currentMission.location || ''} onChange={e=>handleUpdate('location', e.target.value)} /></div>
                                     <div className="bg-white p-8 rounded-[40px] border border-slate-100 shadow-sm space-y-6 text-black leading-none text-black text-left">
-                                        <div className="flex items-center justify-between text-sky-600 leading-none text-black text-left"><div className="flex items-center gap-3 text-black leading-none text-black text-left"><Navigation size={24}/><h4 className="text-xs font-black uppercase text-black leading-none text-black text-left">Points Décollage GPS</h4></div>{!isLocked && <button onClick={()=>handleUpdate('takeOffPoints', [...(currentMission.takeOffPoints||[]), {name:'', coords:''}])} className="bg-sky-600 text-white p-2 rounded-xl leading-none text-black text-left"><Plus size={18} className="text-white"/></button>}</div>
+                                        <div className="flex items-center justify-between text-sky-600 leading-none text-black text-left"><div className="flex items-center gap-3 text-black leading-none text-black text-left"><Navigation size={24}/><h4 className="text-xs font-black uppercase text-black leading-none text-black">Points Décollage GPS</h4></div>{!isLocked && <button onClick={()=>handleUpdate('takeOffPoints', [...(currentMission.takeOffPoints||[]), {name:'', coords:''}])} className="bg-sky-600 text-white p-2 rounded-xl leading-none text-black"><Plus size={18} className="text-white"/></button>}</div>
                                         <div className="space-y-4 text-black text-left leading-none">{(currentMission.takeOffPoints || []).map((point, i) => (<div key={i} className="bg-slate-50 border-2 border-slate-100 p-5 rounded-3xl space-y-3 relative text-black text-left leading-none text-black text-left">{!isLocked && <button onClick={()=>{const n=[...currentMission.takeOffPoints]; n.splice(i,1); handleUpdate('takeOffPoints',n)}} className="absolute top-4 right-4 text-red-300 leading-none text-black text-left"><Trash2 size={16} className="text-red-400"/></button>}<input disabled={isLocked} className="bg-white border border-slate-200 rounded-xl p-3 text-xs font-black text-black outline-none w-full leading-none text-black text-left" value={point.name} placeholder="Nom" onChange={e=>{const n=[...currentMission.takeOffPoints]; n[i].name=e.target.value; handleUpdate('takeOffPoints',n)}} /><div className="flex gap-2 items-center text-black text-left mt-2"><MapPin size={14} className="text-sky-600"/><a href={isLocked && point.coords ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(point.coords)}` : undefined} target="_blank" rel="noopener noreferrer" className={`text-xs font-black text-sky-600 w-full outline-none leading-none ${isLocked ? 'hover:underline cursor-pointer' : ''}`}>{!isLocked ? (<input className="bg-transparent w-full outline-none" value={point.coords} placeholder="GPS" onChange={e=>{const n=[...currentMission.takeOffPoints]; n[i].coords=e.target.value; handleUpdate('takeOffPoints',n)}}/>) : (point.coords || "GPS non défini")}</a></div></div>))}</div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-6 leading-none text-black text-left">
@@ -711,7 +744,38 @@ export default function App() {
 
                     {activeTab === 'flight' && (
                         <div className="animate-in fade-in duration-500 space-y-10 text-left text-black text-left">
-                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm leading-none text-black text-left"><table className="w-full text-left text-black text-left"><thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase border-b border-slate-100 text-black text-left"><tr><th className="p-7 text-left">#</th><th className="p-7 text-left">Horaires</th><th className="p-7 text-left">Batt.</th><th className="p-7 text-right">Durée</th>{!isLocked && <th className="p-7 text-center">Action</th>}</tr></thead><tbody className="divide-y divide-slate-100 text-black text-left">{(currentMission.logs || []).map((l, i) => (<tr key={l.id} className="hover:bg-slate-50 transition-colors text-black text-left"><td className="p-7 text-slate-300 font-black text-left">{i+1}</td><td className="p-7 font-mono text-xs text-left">{l.start || '--:--'} ➔ {l.end || '--:--'}</td><td className="p-7 text-sky-600 font-black text-left">{l.battery}%</td><td className="p-7 text-right font-black text-lg tabular-nums text-left">{formatDuration(calculateDuration(l.start, l.end))}</td>{!isLocked && <td className="p-7 text-center text-left"><button onClick={()=>{const nl=[...currentMission.logs]; nl.splice(i,1); handleUpdate('logs',nl)}} className="text-red-300 hover:text-red-500 text-left"><Trash2 size={18}/></button></td>}</tr>))}</tbody></table></div>
+                            <div className="bg-white border-2 border-slate-100 rounded-[48px] overflow-hidden shadow-sm leading-none text-black text-left">
+                                <table className="w-full text-left text-black text-left">
+                                    <thead className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase border-b border-slate-100 text-black text-left">
+                                        <tr><th className="p-7 text-left">#</th><th className="p-7 text-left">Horaires</th><th className="p-7 text-left">Batt.</th><th className="p-7 text-right">Durée</th>{!isLocked && <th className="p-7 text-center">Action</th>}</tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 text-black text-left">
+                                        {(currentMission.logs || []).map((l, i) => (
+                                            <tr key={l.id} className="hover:bg-slate-50 transition-colors text-black text-left">
+                                                <td className="p-7 text-slate-300 font-black text-left">{i+1}</td>
+                                                <td className="p-7 font-mono text-xs text-left">{l.start || '--:--'} ➔ {l.end || '--:--'}</td>
+                                                <td className="p-7 text-sky-600 font-black text-left">{l.battery}%</td>
+                                                <td className="p-7 text-right font-black text-lg tabular-nums text-left">{formatDuration(calculateDuration(l.start, l.end))}</td>
+                                                {!isLocked && (
+                                                    <td className="p-7 text-center text-left">
+                                                        <button 
+                                                            onClick={() => {
+                                                                if(confirm("Supprimer ce vol ?")) {
+                                                                    const nl = currentMission.logs.filter(log => log.id !== l.id);
+                                                                    handleUpdate('logs', nl);
+                                                                }
+                                                            }} 
+                                                            className="text-red-300 hover:text-red-500 text-left"
+                                                        >
+                                                            <Trash2 size={18}/>
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                             {!isLocked && <button onClick={()=>handleUpdate('logs', [...(currentMission.logs||[]), {id:Date.now(), start:'12:00', end:'12:20', battery:'40'}])} className="w-full py-6 border-2 border-dashed border-slate-200 rounded-[32px] text-slate-400 font-black uppercase text-xs hover:bg-white text-left">+ Saisie manuelle</button>}
                         </div>
                     )}
