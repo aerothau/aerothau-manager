@@ -74,13 +74,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// --- COMPOSANT LOGO DYNAMIQUE ---
-const Logo = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 70" fill="none" className={className}>
-    <path d="M20 55 L40 15 L60 55 M30 45 L50 45" stroke="currentColor" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round"/>
-    <text x="75" y="50" fontFamily="Arial" fontSize="38" fontWeight="900" fill="currentColor" letterSpacing="-1">AEROTHAU</text>
-  </svg>
-);
+const LOGO_URL = "logo.png"; 
 
 // --- 2. IA WEATHER INTEGRATION ---
 const apiKey = ""; 
@@ -145,7 +139,9 @@ const calculateDuration = (start, end) => {
   try {
     const [h1, m1] = start.split(':').map(Number);
     const [h2, m2] = end.split(':').map(Number);
-    let diff = (new Date(0, 0, 0, h2, m2).getTime() - new Date(0, 0, 0, h1, m1).getTime()) / 60000;
+    let d1 = new Date(0, 0, 0, h1, m1);
+    let d2 = new Date(0, 0, 0, h2, m2);
+    let diff = (d2.getTime() - d1.getTime()) / 60000;
     return diff < 0 ? diff + 1440 : diff;
   } catch(e) { return 0; }
 };
@@ -176,9 +172,7 @@ const LoginScreen = () => {
     return (
         <div className="h-screen bg-slate-950 flex items-center justify-center p-4">
             <div className="bg-white p-12 rounded-[48px] shadow-2xl w-full max-w-md text-center border-t-8 border-sky-500 animate-in zoom-in-95">
-                <div className="h-24 flex items-center justify-center mb-6 text-slate-900">
-                    <Logo className="h-full w-auto" />
-                </div>
+                <img src={LOGO_URL} className="h-24 mx-auto mb-10 object-contain" alt="Aerothau" />
                 <h2 className="text-3xl font-black mb-1 uppercase text-slate-900 tracking-tighter">Pilote Manager</h2>
                 <p className="text-slate-400 text-[10px] font-black uppercase mb-12 tracking-widest text-center">Aerothau Operational Center</p>
                 <form onSubmit={login} className="space-y-6 text-left">
@@ -548,7 +542,7 @@ export default function App() {
       <nav className="sticky top-0 z-50 shadow-xl border-b border-slate-700 px-4 md:px-8 py-4 flex justify-between items-center bg-slate-900 text-white print:hidden leading-none text-left">
         <div className="flex items-center gap-5 leading-none text-white">
           {view !== 'list' && <button onClick={() => setView('list')} className="hover:bg-slate-700 p-2 rounded-xl transition-all leading-none text-white"><ChevronLeft size={24}/></button>}
-          <Logo className="h-8 w-auto text-white"/>
+          <span className="font-black text-2xl tracking-tighter uppercase leading-none text-white">Aerothau</span>
         </div>
         <div className="flex gap-2 text-black leading-none">
           {view === 'list' ? (
@@ -604,7 +598,7 @@ export default function App() {
                 <div className="p-8 md:p-14 print:p-0 leading-none text-black text-left text-black text-left">
                     <div className="hidden print:flex justify-between items-start border-b-8 border-slate-900 pb-12 mb-12 text-black leading-none text-black text-left">
                         <div><h1 className="text-6xl font-black uppercase tracking-tighter text-black leading-none mb-3">Compte-Rendu Mission</h1><div className="flex gap-6 text-slate-500 font-black uppercase tracking-widest text-sm leading-none text-black text-left"><span>Référence : {currentMission.ref}</span><span>Date : {new Date(currentMission.date).toLocaleDateString()}</span></div></div>
-                        <Logo className="h-24 w-auto text-black"/>
+                        <img src={LOGO_URL} className="h-24 object-contain leading-none text-black text-left" alt="Aerothau" />
                     </div>
 
                     {activeTab === 'general' && (
